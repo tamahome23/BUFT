@@ -26,22 +26,14 @@
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        
         .hide { display: none !important; }
-        
         .item-cleared td { opacity: 0.4; transition: opacity 0.3s ease; }
-        .item-cleared:hover td { opacity: 0.65; }
         .item-cleared .item-name, .item-cleared .item-amount { text-decoration: line-through; }
-        
         .day-checkbox input:checked + div { background-color: #4f46e5; color: white; border-color: #4f46e5; }
-        
         .toggle-checkbox:checked { right: 0; border-color: #10b981; }
         .toggle-checkbox:checked + .toggle-label { background-color: #10b981; }
         .toggle-checkbox { right: 4px; z-index: 1; transition: all 0.3s; }
         .toggle-label { transition: all 0.3s; }
-
-        .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
     </style>
 </head>
 <body class="text-slate-800 h-screen flex overflow-hidden antialiased">
@@ -58,16 +50,13 @@
                         <path d="M 5 50 L 25 53 M 2 60 L 23 60 M 7 70 L 26 67 M 115 50 L 95 53 M 118 60 L 97 60 M 113 70 L 94 67" fill="none" stroke="#2d1b19" stroke-width="3" stroke-linecap="round"/>
                         <path d="M 48 65 Q 54 72 60 65 Q 66 72 72 65" fill="none" stroke="#2d1b19" stroke-width="4" stroke-linecap="round"/>
                         <path d="M 52 68 C 52 88, 68 88, 68 68 Z" fill="#fbcfe8" stroke="#2d1b19" stroke-width="3"/>
-                        <circle cx="32" cy="85" r="14" fill="white" stroke="#2d1b19" stroke-width="4"/>
-                        <circle cx="88" cy="85" r="14" fill="white" stroke="#2d1b19" stroke-width="4"/>
+                        <circle cx="32" cy="85" r="14" fill="white" stroke="#2d1b19" stroke-width="4"/><circle cx="88" cy="85" r="14" fill="white" stroke="#2d1b19" stroke-width="4"/>
                     </svg>
                 </div>
                 <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Welcome to BUFT</h1>
                 <p class="text-sm text-slate-500 font-medium mb-8">BakaNeko's Ultimate Finance Tool</p>
-                
                 <button onclick="loginWithGoogle()" class="w-full flex items-center justify-center bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 px-6 py-3.5 rounded-xl font-bold shadow-sm transition-all transform hover:scale-105">
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6 mr-3" alt="Google">
-                    Sign in with Google
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6 mr-3" alt="Google"> Sign in with Google
                 </button>
             </div>
         </div>
@@ -76,362 +65,132 @@
     <!-- MAIN APP INTERFACE -->
     <div id="main-app" class="flex w-full h-full opacity-0 transition-opacity duration-500 hide">
         
-        <!-- ACCESS VERIFICATION GATE (Bouncer) -->
+        <!-- ACCESS VERIFICATION GATE (The Bouncer) -->
         <div id="access-gate-overlay" class="absolute inset-0 bg-slate-900/80 backdrop-blur-md z-[150] flex flex-col items-center justify-center hidden opacity-0 transition-all duration-300">
-            <div class="bg-white p-8 rounded-3xl shadow-2xl flex flex-col max-w-lg w-[90%] relative overflow-hidden border-t-8 border-brand-500">
+            <div class="bg-white p-8 rounded-3xl shadow-2xl flex flex-col max-w-lg w-[90%] border-t-8 border-brand-500">
                 <div class="flex items-center mb-6">
-                    <div class="bg-brand-100 p-3 rounded-full mr-4">
-                        <i class="ph-fill ph-shield-check text-3xl text-brand-600"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Private Access Required</h2>
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Disclaimer & Verification</p>
-                    </div>
+                    <div class="bg-brand-100 p-3 rounded-full mr-4"><i class="ph-fill ph-shield-check text-3xl text-brand-600"></i></div>
+                    <div><h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Private Access Required</h2><p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Disclaimer & Verification</p></div>
                 </div>
-                
                 <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 text-sm text-slate-600 leading-relaxed">
-                    <p class="mb-3">This is a private, self-hosted instance of BUFT. By proceeding, you acknowledge that any financial data entered here is stored on the owner's private cloud database.</p>
-                    <p>If you do not have the code to accept these terms, please reach out to the owner for permission and/or the code at <a href="mailto:bakaneko@bakeaneko.net" class="font-bold text-brand-600 hover:underline">bakaneko@bakeaneko.net</a>.</p>
+                    <p class="mb-3">This is a private, self-hosted instance of BUFT. Data is stored on owner's private cloud.</p>
+                    <p>Contact the owner for the access code at <a href="mailto:bakaneko@bakeaneko.net" class="font-bold text-brand-600 hover:underline">bakaneko@bakeaneko.net</a>.</p>
                 </div>
-
                 <form onsubmit="verifyAccessCode(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Enter Invite Code</label>
-                        <input type="text" id="access-code-input" required autocomplete="off" placeholder="Enter code here..." class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 outline-none text-slate-900 font-bold text-center tracking-widest uppercase focus:border-brand-500 transition-colors">
-                        <p id="access-error" class="text-rose-500 text-xs font-bold mt-2 text-center hidden"><i class="ph-bold ph-warning-circle mr-1"></i>Invalid access code.</p>
-                    </div>
-                    <div class="flex gap-3 pt-2">
-                        <button type="button" onclick="logoutUser()" class="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-600 py-3 rounded-xl font-bold transition-colors">Cancel</button>
-                        <button type="submit" class="w-2/3 bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold shadow-md transition-all">Acknowledge & Enter</button>
-                    </div>
+                    <input type="text" id="access-code-input" required placeholder="Enter code..." class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-center font-bold tracking-widest uppercase focus:border-brand-500 outline-none">
+                    <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold shadow-md">Acknowledge & Enter</button>
                 </form>
             </div>
         </div>
 
-        <aside class="w-20 lg:w-64 bg-white border-r border-slate-200 flex flex-col hidden md:flex shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
-            <div class="h-28 flex flex-col items-center justify-center border-b border-slate-100 px-4">
-                <div class="group relative flex flex-col items-center cursor-help">
-                    <div class="flex items-center">
-                        <div class="relative drop-shadow-sm transition-transform hover:scale-105">
-                            <svg viewBox="0 0 120 100" class="w-14 h-14" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M 20 55 C 15 80, 30 95, 60 95 C 90 95, 105 80, 100 55 C 95 30, 90 25, 80 5 L 70 30 C 65 28, 55 28, 50 30 L 40 5 C 30 25, 25 30, 20 55 Z" fill="white" stroke="#2d1b19" stroke-width="4" stroke-linejoin="round"/>
-                                <path d="M 35 48 L 45 53 L 35 58 M 85 48 L 75 53 L 85 58" fill="none" stroke="#2d1b19" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-                                <path d="M 5 50 L 25 53 M 2 60 L 23 60 M 7 70 L 26 67 M 115 50 L 95 53 M 118 60 L 97 60 M 113 70 L 94 67" fill="none" stroke="#2d1b19" stroke-width="3" stroke-linecap="round"/>
-                                <path d="M 48 65 Q 54 72 60 65 Q 66 72 72 65" fill="none" stroke="#2d1b19" stroke-width="4" stroke-linecap="round"/>
-                                <path d="M 52 68 C 52 88, 68 88, 68 68 Z" fill="#fbcfe8" stroke="#2d1b19" stroke-width="3"/>
-                                <circle cx="32" cy="85" r="14" fill="white" stroke="#2d1b19" stroke-width="4"/>
-                                <circle cx="88" cy="85" r="14" fill="white" stroke="#2d1b19" stroke-width="4"/>
-                            </svg>
-                        </div>
-                        <span class="text-3xl font-extrabold text-slate-900 ml-3 hidden lg:block tracking-tight">BUFT</span>
-                    </div>
-                    <span class="text-[9px] font-bold text-slate-400 mt-2 hidden lg:block uppercase tracking-widest text-center leading-tight">BakaNeko's Ultimate Finance Tool</span>
-                    
-                    <div class="absolute left-full lg:left-auto lg:top-full lg:mt-2 ml-4 lg:ml-0 w-max px-3 py-2 bg-slate-900 text-white text-[11px] font-bold rounded-lg opacity-0 group-hover:opacity-100 transition-all pointer-events-none z-[100] shadow-xl transform scale-95 group-hover:scale-100">
-                        Created by Paul Bienvenu (aka BakaNeko)
-                        <div class="absolute top-1/2 -left-1 -translate-y-1/2 lg:top-auto lg:-top-1 lg:left-1/2 lg:-translate-x-1/2 w-2.5 h-2.5 bg-slate-900 rotate-45"></div>
-                    </div>
-                </div>
+        <!-- Sidebar -->
+        <aside class="w-20 lg:w-64 bg-white border-r border-slate-200 flex flex-col hidden md:flex shadow-sm z-10">
+            <div class="h-28 flex items-center justify-center border-b border-slate-100">
+                <span class="text-3xl font-extrabold text-slate-900 hidden lg:block">BUFT</span>
+                <i class="ph-bold ph-cat text-3xl text-brand-600 lg:hidden"></i>
             </div>
-            
-            <nav class="flex-1 p-4 space-y-2 mt-4 flex flex-col">
-                <button onclick="switchTab('ledger')" id="nav-ledger" class="w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl bg-brand-50 text-brand-600 font-semibold transition-all">
-                    <i class="ph-bold ph-list-numbers text-2xl lg:text-xl"></i><span class="hidden lg:block">Ledger</span>
-                </button>
-                <button onclick="switchTab('templates')" id="nav-templates" class="w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-semibold transition-all">
-                    <i class="ph-bold ph-calendar-plus text-2xl lg:text-xl"></i><span class="hidden lg:block">Templates</span>
-                </button>
-                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-semibold transition-all">
-                    <i class="ph-bold ph-chart-polar text-2xl lg:text-xl"></i><span class="hidden lg:block">Insights</span>
-                </button>
-                
-                <div class="mt-auto pt-4 border-t border-slate-100">
-                    <button onclick="logoutUser()" class="w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600 font-semibold transition-all">
-                        <i class="ph-bold ph-sign-out text-2xl lg:text-xl"></i><span class="hidden lg:block">Sign Out</span>
-                    </button>
-                </div>
+            <nav class="flex-1 p-4 space-y-2 flex flex-col">
+                <button onclick="switchTab('ledger')" id="nav-ledger" class="w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl bg-brand-50 text-brand-600 font-bold"><i class="ph-bold ph-list-numbers text-xl"></i><span class="hidden lg:block">Ledger</span></button>
+                <button onclick="switchTab('templates')" id="nav-templates" class="w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl text-slate-500 hover:text-slate-900 font-bold"><i class="ph-bold ph-calendar-plus text-xl"></i><span class="hidden lg:block">Templates</span></button>
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl text-slate-500 hover:text-slate-900 font-bold"><i class="ph-bold ph-chart-polar text-xl"></i><span class="hidden lg:block">Insights</span></button>
+                <button onclick="logoutUser()" class="mt-auto w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl text-slate-400 hover:text-rose-600 font-bold"><i class="ph-bold ph-sign-out text-xl"></i><span class="hidden lg:block">Sign Out</span></button>
             </nav>
         </aside>
 
-        <div class="md:hidden fixed bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-200 flex justify-around p-2 pb-safe z-50 shadow-[0_-4px_24px_rgba(0,0,0,0.05)]">
-            <button onclick="switchTab('ledger')" class="flex flex-col items-center p-2 text-brand-600"><i class="ph-bold ph-list-numbers text-2xl mb-1"></i><span class="text-[10px] font-bold uppercase tracking-wider">Ledger</span></button>
-            <button onclick="switchTab('templates')" class="flex flex-col items-center p-2 text-slate-400"><i class="ph-bold ph-calendar-plus text-2xl mb-1"></i><span class="text-[10px] font-bold uppercase tracking-wider">Templates</span></button>
-            <button onclick="switchTab('dashboard')" class="flex flex-col items-center p-2 text-slate-400"><i class="ph-bold ph-chart-polar text-2xl mb-1"></i><span class="text-[10px] font-bold uppercase tracking-wider">Insights</span></button>
-        </div>
-
+        <!-- Main Content -->
         <main class="flex-1 flex flex-col h-full overflow-hidden relative">
-            <header class="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 shrink-0 z-10">
-                <div class="flex items-center gap-2 lg:gap-4">
-                    <div class="flex items-center bg-slate-100 rounded-full p-1 border border-slate-200 shadow-sm">
-                        <button id="btn-prev-month" onclick="changeMonth(-1)" class="w-8 h-8 flex items-center justify-center hover:bg-white rounded-full transition-colors text-slate-500 hover:text-slate-900 shadow-sm disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"><i class="ph-bold ph-caret-left"></i></button>
-                        <h2 id="current-month-display" class="text-sm lg:text-base font-bold w-32 lg:w-36 text-center text-slate-800 tracking-tight">Loading...</h2>
-                        <button id="btn-next-month" onclick="changeMonth(1)" class="w-8 h-8 flex items-center justify-center hover:bg-white rounded-full transition-colors text-slate-500 hover:text-slate-900 shadow-sm disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"><i class="ph-bold ph-caret-right"></i></button>
-                    </div>
-                    <button onclick="goToToday()" class="px-3.5 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-600 rounded-full text-[10px] lg:text-xs font-bold uppercase tracking-wider transition-colors shadow-sm hidden sm:block border border-brand-100">Today</button>
+            <header class="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-8 shrink-0 z-10">
+                <div class="flex items-center gap-4">
+                    <button onclick="changeMonth(-1)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-full"><i class="ph-bold ph-caret-left"></i></button>
+                    <h2 id="current-month-display" class="font-bold text-slate-800 w-36 text-center">Loading...</h2>
+                    <button onclick="changeMonth(1)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-full"><i class="ph-bold ph-caret-right"></i></button>
                 </div>
-                
-                <div class="flex items-center gap-3 lg:gap-6">
-                    <div class="flex items-center bg-slate-50 px-4 py-2 rounded-full border border-slate-200 shadow-sm">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2 hidden md:block">Bank:</span>
-                        <span class="text-slate-400 font-bold">$</span>
+                <div class="flex items-center gap-6">
+                    <div class="bg-slate-50 px-4 py-2 rounded-full border border-slate-200 flex items-center">
+                        <span class="text-slate-400 font-bold mr-2">$</span>
                         <input type="number" id="manual-bank-balance" class="font-extrabold text-slate-800 w-24 outline-none bg-transparent" onchange="updateBankBalance(this.value)">
                     </div>
-                    
-                    <button onclick="openTransactionModal()" class="bg-slate-900 hover:bg-brand-600 text-white p-2 lg:px-5 lg:py-2.5 rounded-full font-semibold shadow-lg shadow-slate-900/20 flex items-center transition-all transform hover:scale-105">
-                        <i class="ph-bold ph-plus lg:mr-2 text-xl lg:text-base"></i> <span class="hidden lg:inline">Add Item</span>
+                    <button onclick="openTransactionModal()" class="bg-slate-900 hover:bg-brand-600 text-white px-5 py-2.5 rounded-full font-bold shadow-lg shadow-slate-900/20 flex items-center">
+                        <i class="ph-bold ph-plus mr-2"></i> Add Item
                     </button>
                 </div>
             </header>
 
-            <div class="flex-1 overflow-y-auto p-4 lg:p-8 pb-28 md:pb-8 scroll-smooth relative" id="main-scroll-area">
-                
+            <div class="flex-1 overflow-y-auto p-8 relative" id="main-scroll-area">
                 <div id="data-loader" class="absolute inset-0 bg-[#f4f7f9] z-50 flex flex-col items-center justify-center">
                     <i class="ph-bold ph-spinner animate-spin text-4xl text-brand-500 mb-4"></i>
-                    <span class="text-slate-500 font-bold tracking-widest uppercase text-xs">Syncing Ledger...</span>
+                    <span class="text-slate-500 font-bold tracking-widest uppercase text-xs">Syncing Cloud Ledger...</span>
                 </div>
 
                 <!-- LEDGER VIEW -->
                 <div id="view-ledger" class="max-w-7xl mx-auto space-y-6">
-                    <div id="archival-notice" class="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl flex items-center hide shadow-sm">
-                        <i class="ph-fill ph-lock-key text-xl mr-3"></i>
-                        <span class="text-sm font-bold">Historical View: This month is in the past. Template changes will not alter these records.</span>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm"><span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Remaining Impact</span><div id="metric-remaining" class="text-3xl font-extrabold text-slate-900 mt-1">$0.00</div></div>
+                        <div class="bg-slate-900 p-6 rounded-3xl shadow-xl text-white"><span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Projected EOM</span><div id="metric-projected" class="text-3xl font-extrabold mt-1 text-emerald-400">$0.00</div></div>
                     </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-center relative overflow-hidden">
-                            <div class="absolute top-0 right-0 p-4 opacity-5 text-slate-400"><i class="ph-fill ph-hourglass-high text-7xl"></i></div>
-                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 z-10">Remaining to Process</span>
-                            <div id="metric-remaining" class="text-3xl font-extrabold text-slate-900 mt-1 tracking-tight z-10">$0.00</div>
-                        </div>
-                        <div class="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-3xl shadow-xl shadow-slate-900/20 flex flex-col justify-center relative overflow-hidden text-white">
-                            <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-                            <div class="absolute top-0 right-0 p-4 opacity-10"><i class="ph-fill ph-check-circle text-7xl"></i></div>
-                            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 z-10">Projected EOM Balance</span>
-                            <div id="metric-projected" class="text-3xl font-extrabold mt-1 tracking-tight z-10 text-emerald-400">$0.00</div>
-                        </div>
-                    </div>
-
                     <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="bg-slate-50/50 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-400 tracking-wider">
-                                        <th class="py-4 px-6 w-24">Date</th>
-                                        <th class="py-4 px-6">Item</th>
-                                        <th class="py-4 px-6">Category</th>
-                                        <th class="py-4 px-6 text-right">Amount</th>
-                                        <th class="py-4 px-6 text-center w-40">Status</th>
-                                        <th class="py-4 px-6 text-right w-36 bg-ledger-highlight/50 text-slate-500">Running Total</th>
-                                        <th class="py-4 px-4 text-center w-24"></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ledger-body" class="text-sm"></tbody>
-                            </table>
-                        </div>
+                        <table class="w-full text-left border-collapse">
+                            <thead><tr class="bg-slate-50 border-b border-slate-100 text-[11px] font-bold uppercase text-slate-400 tracking-wider"><th class="py-4 px-6">Date</th><th class="py-4 px-6">Item</th><th class="py-4 px-6">Category</th><th class="py-4 px-6 text-right">Amount</th><th class="py-4 px-6 text-center">Status</th><th class="py-4 px-6 text-right">Running Total</th><th class="py-4 px-6"></th></tr></thead>
+                            <tbody id="ledger-body" class="text-sm"></tbody>
+                        </table>
                     </div>
                 </div>
 
                 <!-- TEMPLATES VIEW -->
                 <div id="view-templates" class="max-w-7xl mx-auto hide space-y-6">
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-3xl border border-slate-200 shadow-sm gap-4">
-                        <div>
-                            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Recurring Rules</h2>
-                            <p class="text-slate-500 text-sm mt-1">Changes here affect current and future months. Past months are locked.</p>
-                        </div>
-                        <div class="flex items-center space-x-4 w-full md:w-auto">
-                            <div class="bg-slate-100 p-1 rounded-xl flex">
-                                <button onclick="setTemplateView('category')" id="btn-view-cat" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-brand-600 shadow-sm transition-all">By Category</button>
-                                <button onclick="setTemplateView('recurrence')" id="btn-view-rec" class="px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all">By Recurrence</button>
-                            </div>
-                            <button onclick="openTemplateModal()" class="flex-1 md:flex-none justify-center bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 flex items-center transition-all">
-                                <i class="ph-bold ph-plus mr-2"></i> New
-                            </button>
-                        </div>
-                    </div>
-                    <div id="templates-container" class="space-y-8"></div>
+                    <div class="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-200"><h2 class="text-2xl font-extrabold text-slate-900">Recurring Rules</h2><button onclick="openTemplateModal()" class="bg-brand-600 text-white px-5 py-2.5 rounded-xl font-bold">New Rule</button></div>
+                    <div id="templates-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
                 </div>
 
-                <!-- DASHBOARD VIEW -->
+                <!-- INSIGHTS VIEW -->
                 <div id="view-dashboard" class="max-w-7xl mx-auto hide space-y-6">
-                    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                        <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Monthly Insights</h2>
-                    </div>
-                    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                        <h3 class="font-bold text-slate-800 mb-6 flex items-center"><i class="ph-fill ph-trend-up text-brand-500 mr-2 text-xl"></i> Running Impact Trend</h3>
-                        <div class="relative h-64 w-full"><canvas id="balanceTrendChart"></canvas></div>
-                    </div>
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                            <h3 class="font-bold text-slate-800 mb-6 flex items-center"><i class="ph-fill ph-scales text-brand-500 mr-2 text-xl"></i> Cash Flow</h3>
-                            <div class="relative h-64 w-full"><canvas id="cashflowChart"></canvas></div>
-                        </div>
-                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                            <h3 class="font-bold text-slate-800 mb-6 flex items-center"><i class="ph-fill ph-chart-pie-slice text-brand-500 mr-2 text-xl"></i> Withdrawals by Category</h3>
-                            <div class="relative h-64 w-full flex justify-center"><canvas id="categoryChart"></canvas></div>
-                        </div>
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200">
+                        <h2 class="text-2xl font-extrabold text-slate-900 mb-6">Cash Flow Analysis</h2>
+                        <div class="h-64"><canvas id="cashflowChart"></canvas></div>
                     </div>
                 </div>
-
             </div>
         </main>
     </div>
 
-    <!-- Modals -->
-    <div id="modal-transaction" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[100] px-4 opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300">
-            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 class="font-extrabold text-lg text-slate-800">Ledger Entry</h3>
-                <button onclick="closeModal('transaction')" class="text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-100 rounded-full p-1.5 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
+    <!-- MODALS -->
+    <div id="modal-transaction" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[100] px-4 opacity-0 transition-all duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="font-extrabold text-lg text-slate-800">Add Ledger Entry</h3>
+                <button onclick="closeModal('transaction')" class="text-slate-400 hover:text-slate-700"><i class="ph-bold ph-x text-xl"></i></button>
             </div>
-            <form id="form-transaction" onsubmit="handleTransactionSubmit(event)" class="p-6 space-y-4">
+            <form onsubmit="handleTransactionSubmit(event)" class="p-6 space-y-4">
                 <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Date</label>
-                        <input type="date" id="txn-date" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-medium bg-slate-50">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Type</label>
-                        <select id="txn-type" onchange="updateCategoryOptions('txn-category', this.value)" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-bold bg-white cursor-pointer shadow-sm">
-                            <option value="withdrawal">Withdrawal (-)</option>
-                            <option value="deposit">Deposit (+)</option>
-                        </select>
-                    </div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Date</label><input type="date" id="txn-date" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none bg-slate-50"></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Type</label><select id="txn-type" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none font-bold bg-white"><option value="withdrawal">Withdrawal (-)</option><option value="deposit">Deposit (+)</option></select></div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Description</label>
-                    <input type="text" id="txn-name" required placeholder="e.g., Target Run" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 shadow-sm">
-                </div>
+                <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Description</label><input type="text" id="txn-name" required placeholder="e.g., Groceries" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none"></div>
                 <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Amount ($)</label>
-                        <input type="number" step="0.01" id="txn-amount" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-bold shadow-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Category</label>
-                        <select id="txn-category" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 bg-white shadow-sm cursor-pointer"></select>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Comment (Optional)</label>
-                    <input type="text" id="txn-comment" placeholder="e.g., cleared temporarily" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 shadow-sm text-sm">
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Amount ($)</label><input type="number" step="0.01" id="txn-amount" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none font-bold"></div>
+                    <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1.5">Category</label><select id="txn-category" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none bg-white"><option value="Home">Home</option><option value="Services">Services</option><option value="Subscription">Subscription</option><option value="Auto">Auto</option><option value="Other">Other</option></select></div>
                 </div>
                 <div class="pt-4 flex justify-end space-x-3 border-t border-slate-100 mt-2">
-                    <button type="button" onclick="closeModal('transaction')" class="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold">Cancel</button>
-                    <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-brand-600 text-white rounded-xl font-bold shadow-md">Save Item</button>
+                    <button type="button" onclick="closeModal('transaction')" class="px-5 py-2.5 text-slate-600 font-bold">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 bg-slate-900 text-white rounded-xl font-bold shadow-md">Save Item</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="modal-comment" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[110] px-4 opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform scale-95 transition-transform duration-300">
-            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-brand-50">
-                <h3 class="font-extrabold text-lg text-brand-900"><i class="ph-fill ph-chat-text mr-2 text-brand-600"></i>Line Comment</h3>
-                <button onclick="closeModal('comment')" class="text-brand-400 hover:text-brand-700 bg-white hover:bg-brand-100 rounded-full p-1.5 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
-            </div>
-            <div class="p-6">
-                <input type="hidden" id="edit-comment-id">
-                <textarea id="edit-comment-text" rows="3" class="w-full border border-slate-200 rounded-xl p-4 outline-none text-slate-700 shadow-sm focus:ring-2 focus:ring-brand-500 mb-4" placeholder="Add your freehand notes here..."></textarea>
-                <div class="flex justify-end space-x-3">
-                    <button type="button" onclick="closeModal('comment')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-bold">Cancel</button>
-                    <button type="button" onclick="saveLedgerComment()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold shadow-md">Save Note</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="modal-template" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[100] px-4 opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300 max-h-[90vh] flex flex-col">
-            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
-                <h3 class="font-extrabold text-lg text-slate-800" id="tpl-modal-title">New Template</h3>
-                <button onclick="closeModal('template')" class="text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-100 rounded-full p-1.5 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
-            </div>
-            <form id="form-template" onsubmit="handleTemplateSubmit(event)" class="p-6 space-y-4 overflow-y-auto">
-                <input type="hidden" id="tpl-id">
-                <div class="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                    <div>
-                        <span class="block text-sm font-bold text-slate-800">Auto-Processing</span>
-                        <span class="block text-[11px] font-medium text-slate-500 mt-0.5">Automatically clears when date passes</span>
-                    </div>
-                    <div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
-                        <input type="checkbox" id="tpl-autoprocess" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
-                        <label for="tpl-autoprocess" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-300 cursor-pointer"></label>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Template Name</label>
-                    <input type="text" id="tpl-name" required placeholder="e.g., Netflix" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-medium shadow-sm">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Type</label>
-                        <select id="tpl-type" onchange="updateCategoryOptions('tpl-category', this.value)" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-bold bg-white shadow-sm cursor-pointer">
-                            <option value="withdrawal">Withdrawal (-)</option>
-                            <option value="deposit">Deposit (+)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Amount ($)</label>
-                        <input type="number" step="0.01" id="tpl-amount" required class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-bold shadow-sm">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Category</label>
-                    <select id="tpl-category" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-medium bg-white shadow-sm cursor-pointer"></select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Details / Notes</label>
-                    <textarea id="tpl-details" rows="2" class="w-full border border-slate-200 rounded-xl p-3 outline-none text-slate-700 shadow-sm text-sm"></textarea>
-                </div>
-                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Recurrence Pattern</label>
-                    <select id="tpl-frequency" onchange="toggleFrequencyUI()" class="w-full border border-slate-200 rounded-xl px-4 py-2 mb-4 outline-none text-slate-700 font-bold bg-slate-50 cursor-pointer">
-                        <option value="monthly">Monthly (Dates of Month)</option>
-                        <option value="weekly">Weekly (Days of Week)</option>
-                        <option value="custom">Specific Dates (Yearly)</option>
-                    </select>
-                    <div id="tpl-ui-monthly" class="transition-all">
-                        <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Select Dates</label>
-                        <div class="grid grid-cols-7 gap-1.5" id="tpl-monthly-grid"></div>
-                    </div>
-                    <div id="tpl-ui-weekly" class="hide transition-all">
-                        <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Select Days</label>
-                        <div class="flex justify-between" id="tpl-weekly-days"></div>
-                    </div>
-                    <div id="tpl-ui-custom" class="hide transition-all">
-                        <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Add Dates (MM/DD)</label>
-                        <div class="flex gap-2 mb-2">
-                            <input type="number" id="tpl-custom-mm" placeholder="MM" class="w-20 border border-slate-200 rounded-xl px-3 py-2 text-center outline-none bg-slate-50">
-                            <span class="text-slate-400 font-bold self-center">/</span>
-                            <input type="number" id="tpl-custom-dd" placeholder="DD" class="w-20 border border-slate-200 rounded-xl px-3 py-2 text-center outline-none bg-slate-50">
-                            <button type="button" onclick="addCustomDateToDraft()" class="bg-slate-800 text-white px-4 rounded-xl font-bold">Add</button>
-                        </div>
-                        <div id="draft-custom-dates" class="flex flex-wrap gap-2 mt-3"></div>
-                    </div>
-                </div>
-                <div class="pt-4 flex justify-end space-x-3 border-t border-slate-100 shrink-0">
-                    <button type="button" onclick="closeModal('template')" class="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold">Cancel</button>
-                    <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-brand-600 text-white rounded-xl font-bold shadow-md" id="tpl-save-btn">Save Rule</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- FIREBASE CLOUD ENGINE SCRIPT -->
+    <!-- FIREBASE CLOUD ENGINE -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Firebase Config
         const firebaseConfig = {
             apiKey: "AIzaSyCkZHoWGByIZXzFSGjrZMHgEytwdqyZLqE",
             authDomain: "buft-b0d7f.firebaseapp.com",
             projectId: "buft-b0d7f",
             storageBucket: "buft-b0d7f.firebasestorage.app",
             messagingSenderId: "724127677004",
-            appId: "1:724127677004:web:080d212affb3cb87ccd2e9",
-            measurementId: "G-NDCGFDJEGC"
+            appId: "1:724127677004:web:080d212affb3cb87ccd2e9"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -440,23 +199,13 @@
 
         let currentUser = null;
         let dataLoaded = { settings: false, txns: false, tpls: false };
-        let hasInitializedCore = false; 
+        let hasInitializedCore = false;
+        let cashflowChart = null;
+        const REAL_CURRENT_DATE = new Date();
 
-        const REAL_CURRENT_DATE = new Date(); 
-        const WINDOW_START = new Date(2025, 0, 1);
-        const WINDOW_END = new Date(2026, 11, 31);
+        window.state = { currentDate: new Date(REAL_CURRENT_DATE), bankBalance: 0, initializedMonths: [], transactions: [], templates: [], hasAcceptedTerms: false };
 
-        window.state = {
-            currentDate: new Date(REAL_CURRENT_DATE), 
-            bankBalance: 0,
-            templateViewMode: 'category', 
-            initializedMonths: [], 
-            transactions: [],
-            templates: [],
-            hasAcceptedTerms: false
-        };
-
-        // --- AUTH LOGIC ---
+        // AUTH LISTENER
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
@@ -469,66 +218,58 @@
                 setupCloudSync();
             } else {
                 currentUser = null;
+                document.getElementById('login-overlay').classList.remove('hide');
                 document.getElementById('main-app').classList.add('hide');
-                document.getElementById('main-app').classList.add('opacity-0');
-                const overlay = document.getElementById('login-overlay');
-                overlay.classList.remove('hide');
-                setTimeout(() => overlay.classList.remove('opacity-0'), 10);
             }
         });
 
-        window.loginWithGoogle = () => {
-            const provider = new GoogleAuthProvider();
-            signInWithPopup(auth, provider).catch(err => alert("Login Error: " + err.message));
-        };
-
+        window.loginWithGoogle = () => { signInWithPopup(auth, new GoogleAuthProvider()); };
         window.logoutUser = () => signOut(auth);
 
-        // --- CLOUD SYNC ENGINE ---
-        function setupCloudSync() {
+        // CLOUD SYNC
+        async function setupCloudSync() {
             const uid = currentUser.uid;
             
-            onSnapshot(doc(db, 'users', uid, 'settings', 'main'), (docSnap) => {
+            // Check for initial existence of settings to prevent "Loading" hang
+            const settingsRef = doc(db, 'users', uid, 'settings', 'main');
+            const snap = await getDoc(settingsRef);
+            if (!snap.exists()) {
+                // Self-Healing: Create initial record if missing
+                await setDoc(settingsRef, { bankBalance: 0, initializedMonths: [], hasAcceptedTerms: false });
+            }
+
+            onSnapshot(settingsRef, (docSnap) => {
                 if(docSnap.exists()) {
                     state.bankBalance = docSnap.data().bankBalance || 0;
                     state.initializedMonths = docSnap.data().initializedMonths || [];
                     state.hasAcceptedTerms = docSnap.data().hasAcceptedTerms || false;
-                } else {
-                    state.hasAcceptedTerms = false;
                 }
                 dataLoaded.settings = true;
                 checkReadyToInit();
             });
 
             onSnapshot(collection(db, 'users', uid, 'templates'), (snapshot) => {
-                let tpls = [];
-                snapshot.forEach(doc => tpls.push(doc.data()));
-                state.templates = tpls;
-                dataLoaded.tpls = true;
-                checkReadyToInit();
+                let tpls = []; snapshot.forEach(doc => tpls.push(doc.data()));
+                state.templates = tpls; dataLoaded.tpls = true; checkReadyToInit();
             });
 
             onSnapshot(collection(db, 'users', uid, 'transactions'), (snapshot) => {
-                let txns = [];
-                snapshot.forEach(doc => txns.push(doc.data()));
-                state.transactions = txns;
-                dataLoaded.txns = true;
-                checkReadyToInit();
+                let txns = []; snapshot.forEach(doc => txns.push(doc.data()));
+                state.transactions = txns; dataLoaded.txns = true; checkReadyToInit();
             });
         }
 
         async function checkReadyToInit() {
             if (dataLoaded.settings && dataLoaded.txns && dataLoaded.tpls) {
                 if (!hasInitializedCore) {
-                    // THE BOUNCER CHECK
                     if (!state.hasAcceptedTerms) {
                         document.getElementById('data-loader').classList.add('hidden');
                         const gate = document.getElementById('access-gate-overlay');
                         gate.classList.remove('hidden');
                         setTimeout(() => gate.classList.remove('opacity-0'), 10);
-                        return; // Stop loading app until code is verified
+                        return;
                     }
-                    await completeInitialization();
+                    completeInitialization();
                 } else {
                     renderApp();
                 }
@@ -539,577 +280,138 @@
             hasInitializedCore = true;
             document.getElementById('data-loader').classList.add('hidden');
             const gate = document.getElementById('access-gate-overlay');
-            gate.classList.add('opacity-0');
-            setTimeout(() => gate.classList.add('hidden'), 300);
+            gate.classList.add('opacity-0'); setTimeout(() => gate.classList.add('hidden'), 300);
             
-            await initializeMonth(state.currentDate.getFullYear(), state.currentDate.getMonth());
-            await processAutoClear();
-            renderApp();
-            scrollToTodayDivider();
-        }
-
-        window.verifyAccessCode = function(e) {
-            e.preventDefault();
-            const code = document.getElementById('access-code-input').value.trim().toUpperCase();
-            if (code === 'L337') {
-                document.getElementById('access-error').classList.add('hidden');
-                setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { hasAcceptedTerms: true }, { merge: true }).then(() => {
-                    state.hasAcceptedTerms = true;
-                    completeInitialization();
-                });
-            } else {
-                document.getElementById('access-error').classList.remove('hidden');
+            // Auto-init current month
+            const mKey = `${state.currentDate.getFullYear()}-${(state.currentDate.getMonth()+1).toString().padStart(2,'0')}`;
+            if (!state.initializedMonths.includes(mKey)) {
+                state.initializedMonths.push(mKey);
+                await setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { initializedMonths: state.initializedMonths }, { merge: true });
             }
+            renderApp();
         }
 
-        // --- UI DATA ---
-        window.categoryConfig = {
-            withdrawal: [
-                { name: 'Home', color: 'bg-indigo-100 text-indigo-700' },
-                { name: 'Services', color: 'bg-lime-100 text-lime-800' },
-                { name: 'Subscription', color: 'bg-purple-100 text-purple-700' },
-                { name: 'Auto', color: 'bg-orange-100 text-orange-700' },
-                { name: 'CreditCards', color: 'bg-rose-100 text-rose-700' },
-                { name: 'Utility', color: 'bg-cyan-100 text-cyan-700' },
-                { name: 'Entertainment', color: 'bg-pink-100 text-pink-700' },
-                { name: 'Groceries', color: 'bg-emerald-100 text-emerald-700' },
-                { name: 'Other', color: 'bg-slate-100 text-slate-700' }
-            ],
-            deposit: [
-                { name: 'Direct Deposit', color: 'bg-emerald-100 text-emerald-800' },
-                { name: 'Adjustment', color: 'bg-blue-100 text-blue-800' },
-                { name: 'Other Deposit', color: 'bg-teal-100 text-teal-800' }
-            ]
-        };
-        const daysOfWeek = [ { id: 0, label: 'S' }, { id: 1, label: 'M' }, { id: 2, label: 'T' }, { id: 3, label: 'W' }, { id: 4, label: 'T' }, { id: 5, label: 'F' }, { id: 6, label: 'S' } ];
-
-        let tempCustomDates = []; 
-        let cashflowChartObj = null; let categoryChartObj = null; let balanceTrendChartObj = null;
-
-        setupWeeklyCheckboxes();
-        setupMonthlyGrid();
-        updateCategoryOptions('txn-category', 'withdrawal');
-        updateCategoryOptions('tpl-category', 'withdrawal');
-
-        function getCatColorClass(type, catName) {
-            const list = categoryConfig[type] || [];
-            const found = list.find(c => c.name === catName);
-            return found ? found.color : 'bg-slate-100 text-slate-700';
+        window.verifyAccessCode = async (e) => {
+            e.preventDefault();
+            if (document.getElementById('access-code-input').value.toUpperCase() === 'L337') {
+                await setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { hasAcceptedTerms: true }, { merge: true });
+                state.hasAcceptedTerms = true;
+                completeInitialization();
+            } else alert("Invalid Code");
         }
 
-        window.renderApp = function() {
-            updateHeader();
-            renderLedger();
-            if(!document.getElementById('view-templates').classList.contains('hide')) renderTemplates();
-            if(!document.getElementById('view-dashboard').classList.contains('hide')) renderDashboard();
-        }
-
-        function updateHeader() {
-            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-            document.getElementById('current-month-display').innerText = `${monthNames[state.currentDate.getMonth()]} ${state.currentDate.getFullYear()}`;
+        // RENDERING
+        window.renderApp = () => {
+            const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            document.getElementById('current-month-display').innerText = `${months[state.currentDate.getMonth()]} ${state.currentDate.getFullYear()}`;
             document.getElementById('manual-bank-balance').value = state.bankBalance.toFixed(2);
-
-            const btnPrev = document.getElementById('btn-prev-month');
-            const btnNext = document.getElementById('btn-next-month');
-            let prevTest = new Date(state.currentDate); prevTest.setMonth(prevTest.getMonth() - 1);
-            btnPrev.disabled = prevTest < WINDOW_START;
-            let nextTest = new Date(state.currentDate); nextTest.setMonth(nextTest.getMonth() + 1);
-            btnNext.disabled = nextTest > WINDOW_END;
-
-            const isPastMonth = state.currentDate.getFullYear() < REAL_CURRENT_DATE.getFullYear() || (state.currentDate.getFullYear() === REAL_CURRENT_DATE.getFullYear() && state.currentDate.getMonth() < REAL_CURRENT_DATE.getMonth());
-            if(isPastMonth) document.getElementById('archival-notice').classList.remove('hide');
-            else document.getElementById('archival-notice').classList.add('hide');
-        }
-
-        window.scrollToTodayDivider = function() {
-            setTimeout(() => {
-                const divider = document.getElementById('today-divider');
-                if (divider) divider.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                else { const scrollArea = document.getElementById('main-scroll-area'); if(scrollArea) scrollArea.scrollTop = 0; }
-            }, 100);
-        }
-
-        window.changeMonth = async function(delta) {
-            state.currentDate.setMonth(state.currentDate.getMonth() + delta);
-            await initializeMonth(state.currentDate.getFullYear(), state.currentDate.getMonth());
-            renderApp();
-            if(state.currentDate.getMonth() === REAL_CURRENT_DATE.getMonth() && state.currentDate.getFullYear() === REAL_CURRENT_DATE.getFullYear()) scrollToTodayDivider();
-            else document.getElementById('main-scroll-area').scrollTop = 0;
-        }
-
-        window.goToToday = async function() {
-            state.currentDate = new Date(REAL_CURRENT_DATE);
-            await initializeMonth(state.currentDate.getFullYear(), state.currentDate.getMonth());
-            window.switchTab('ledger');
-            renderApp();
-            scrollToTodayDivider();
-        }
-
-        window.updateBankBalance = function(val) {
-            const num = parseFloat(val) || 0;
-            setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { bankBalance: num }, { merge: true });
-        }
-
-        // --- ASYNC CLOUD LOGIC ---
-        function getMonthKey(year, monthIndex) { return `${year}-${(monthIndex + 1).toString().padStart(2, '0')}`; }
-
-        async function initializeMonth(year, monthIndex) {
-            const monthKey = getMonthKey(year, monthIndex);
-            if (state.initializedMonths.includes(monthKey)) return;
-
-            state.initializedMonths.push(monthKey);
-            const batch = writeBatch(db);
-            batch.set(doc(db, 'users', currentUser.uid, 'settings', 'main'), { initializedMonths: state.initializedMonths }, { merge: true });
-
-            state.templates.forEach(tpl => {
-                const monthStr = (monthIndex + 1).toString().padStart(2, '0');
-                let datesToInject = [];
-
-                if (tpl.frequency === 'monthly') {
-                    tpl.monthlyDays.forEach(day => {
-                        const d = Math.min(day, new Date(year, monthIndex + 1, 0).getDate()); 
-                        datesToInject.push(`${year}-${monthStr}-${d.toString().padStart(2, '0')}`);
-                    });
-                } else if (tpl.frequency === 'weekly') {
-                    let date = new Date(year, monthIndex, 1);
-                    while (date.getMonth() === monthIndex) {
-                        if (tpl.weeklyDays.includes(date.getDay())) datesToInject.push(`${year}-${monthStr}-${date.getDate().toString().padStart(2, '0')}`);
-                        date.setDate(date.getDate() + 1);
-                    }
-                } else if (tpl.frequency === 'custom') {
-                    tpl.customDates.forEach(cd => {
-                        const [m, d] = cd.split('/');
-                        if (parseInt(m) === monthIndex + 1) datesToInject.push(`${year}-${monthStr}-${d.padStart(2, '0')}`);
-                    });
-                }
-
-                datesToInject.forEach(dateStr => {
-                    const id = `tplgen_${tpl.id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
-                    const txn = { id, templateId: tpl.id, date: dateStr, name: tpl.name, amount: tpl.amount, type: tpl.type, category: tpl.category, status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: '' };
-                    batch.set(doc(db, 'users', currentUser.uid, 'transactions', id), txn);
-                });
-            });
-            await batch.commit();
-        }
-
-        async function processAutoClear() {
-            const todayStr = `${REAL_CURRENT_DATE.getFullYear()}-${(REAL_CURRENT_DATE.getMonth()+1).toString().padStart(2,'0')}-${REAL_CURRENT_DATE.getDate().toString().padStart(2,'0')}`;
-            const batch = writeBatch(db);
-            let needsCommit = false;
-
-            state.transactions.forEach(t => {
-                if (t.autoProcess && t.status === 'unprocessed' && t.date <= todayStr) {
-                    batch.update(doc(db, 'users', currentUser.uid, 'transactions', t.id), { status: 'cleared' });
-                    needsCommit = true;
-                }
-            });
-            if(needsCommit) await batch.commit();
-        }
-
-        // --- LEDGER ---
-        function getMonthlyTransactions() {
-            const monthKey = getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
-            return state.transactions.filter(t => t.date.startsWith(monthKey)).sort((a, b) => new Date(a.date) - new Date(b.date));
-        }
-
-        function renderLedger() {
+            
             const tbody = document.getElementById('ledger-body');
             tbody.innerHTML = '';
             
-            const txns = getMonthlyTransactions();
-            let runningTotal = 0; let remainingImpact = 0;
-            const todayStr = `${REAL_CURRENT_DATE.getFullYear()}-${(REAL_CURRENT_DATE.getMonth()+1).toString().padStart(2,'0')}-${REAL_CURRENT_DATE.getDate().toString().padStart(2,'0')}`;
+            const mKey = `${state.currentDate.getFullYear()}-${(state.currentDate.getMonth()+1).toString().padStart(2,'0')}`;
+            const monthTxns = state.transactions.filter(t => t.date.startsWith(mKey)).sort((a,b) => new Date(a.date) - new Date(b.date));
+            
+            let runningTotal = 0; let remaining = 0; let income = 0; let expense = 0;
+            
+            if (monthTxns.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400 italic font-medium">No ledger entries for this month.</td></tr>`;
+            }
 
-            if(txns.length === 0) tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400 font-medium italic">No entries for this month.</td></tr>`;
-
-            let dividerDrawn = false;
-
-            txns.forEach((txn) => {
-                if (!dividerDrawn && txn.date >= todayStr) {
-                    const hasPastItems = txns.some(t => t.date < todayStr);
-                    if (hasPastItems || txn.date === todayStr) {
-                        const divTr = document.createElement('tr');
-                        divTr.id = 'today-divider';
-                        divTr.className = 'bg-yellow-100/50 border-y-2 border-yellow-400';
-                        divTr.innerHTML = `<td colspan="7" class="py-2.5 px-6 text-center shadow-sm"><span class="text-[11px] font-extrabold uppercase tracking-widest text-yellow-800 flex items-center justify-center"><i class="ph-fill ph-star mr-1.5"></i> Today & Future</span></td>`;
-                        tbody.appendChild(divTr);
-                    }
-                    dividerDrawn = true;
-                }
-
-                if (txn.type === 'deposit') { runningTotal += txn.amount; if (txn.status !== 'cleared') remainingImpact += txn.amount; } 
-                else { runningTotal -= txn.amount; if (txn.status !== 'cleared') remainingImpact -= txn.amount; }
-
-                const isCleared = txn.status === 'cleared';
-                const isPast = txn.date < todayStr;
+            monthTxns.forEach(t => {
+                if (t.type === 'deposit') { runningTotal += t.amount; income += t.amount; if(t.status !== 'cleared') remaining += t.amount; }
+                else { runningTotal -= t.amount; expense += t.amount; if(t.status !== 'cleared') remaining -= t.amount; }
                 
-                let rowBgClass = ''; let warningIcon = ''; let dateColor = 'text-slate-500';
-
-                if (isPast) {
-                    if (!isCleared) {
-                        rowBgClass = 'bg-rose-50/80 hover:bg-rose-100/80 border-l-4 border-rose-400';
-                        warningIcon = `<i class="ph-fill ph-warning-circle text-rose-500 mr-1.5" title="Past Due / Uncleared"></i>`;
-                        dateColor = 'text-rose-600 font-extrabold';
-                    } else rowBgClass = 'bg-slate-100/70 border-l-4 border-transparent';
-                } else rowBgClass = 'bg-white hover:bg-slate-50 border-l-4 border-transparent';
-                
-                const amountColor = txn.type === 'deposit' ? 'text-emerald-600' : 'text-slate-900';
-                const amountPrefix = txn.type === 'deposit' ? '+' : '';
-                
-                let statusSelectColor = '';
-                if(txn.status === 'cleared') statusSelectColor = 'bg-slate-100 text-slate-500 border-slate-200';
-                else if(txn.status === 'pending') statusSelectColor = 'bg-amber-100 text-amber-800 border-amber-200 shadow-sm';
-                else statusSelectColor = 'bg-white text-slate-700 border-slate-300 shadow-sm hover:border-brand-400';
-
-                const catColor = getCatColorClass(txn.type, txn.category);
-                const autoIndicator = txn.autoProcess ? `<i class="ph-fill ph-lightning text-brand-500 ml-1.5" title="Auto-processing"></i>` : '';
-                const commentIndicator = txn.comment ? `<div class="text-[10px] text-slate-500 mt-0.5 leading-tight"><i class="ph-fill ph-chat-text mr-1 text-brand-400"></i>${txn.comment}</div>` : '';
-                const commentBtnColor = txn.comment ? 'text-brand-500' : 'text-slate-300 hover:text-brand-500';
-
                 const tr = document.createElement('tr');
-                tr.className = `border-b border-slate-100/80 transition-colors group ${rowBgClass} ${isCleared ? 'item-cleared' : ''}`;
+                tr.className = `border-b border-slate-50 hover:bg-slate-50/50 transition-colors group ${t.status === 'cleared' ? 'item-cleared' : ''}`;
                 tr.innerHTML = `
-                    <td class="py-4 px-6 whitespace-nowrap font-medium ${dateColor}">${formatDate(txn.date)}</td>
-                    <td class="py-4 px-6"><div class="flex flex-col"><span class="font-bold text-slate-800 item-name flex items-center">${warningIcon}${txn.name} ${autoIndicator}</span>${commentIndicator}</div></td>
-                    <td class="py-4 px-6"><span class="px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${catColor}">${txn.category}</span></td>
-                    <td class="py-4 px-6 text-right font-extrabold item-amount ${amountColor}">${amountPrefix}$${txn.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    <td class="py-4 px-6 font-medium text-slate-500">${t.date.split('-')[2]}</td>
+                    <td class="py-4 px-6 font-bold text-slate-800">${t.name}</td>
+                    <td class="py-4 px-6"><span class="bg-slate-100 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider text-slate-600">${t.category}</span></td>
+                    <td class="py-4 px-6 text-right font-extrabold ${t.type === 'deposit' ? 'text-emerald-600' : 'text-slate-900'}">${t.type === 'deposit' ? '+' : ''}$${t.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td class="py-4 px-6 text-center">
-                        <select onchange="updateStatus('${txn.id}', this.value)" class="text-xs font-bold uppercase tracking-wider rounded-full px-4 py-1.5 outline-none appearance-none cursor-pointer border text-center transition-colors focus:ring-2 focus:ring-brand-500 w-32 ${statusSelectColor}">
-                            <option value="unprocessed" ${txn.status === 'unprocessed' ? 'selected' : ''}>Unprocessed</option>
-                            <option value="pending" ${txn.status === 'pending' ? 'selected' : ''}>Pending</option>
-                            <option value="cleared" ${txn.status === 'cleared' ? 'selected' : ''}>Cleared</option>
+                        <select onchange="updateStatus('${t.id}', this.value)" class="text-[10px] font-bold uppercase border border-slate-200 rounded-full px-4 py-1.5 outline-none appearance-none cursor-pointer bg-white shadow-sm text-center">
+                            <option value="unprocessed" ${t.status === 'unprocessed' ? 'selected' : ''}>Uncleared</option>
+                            <option value="cleared" ${t.status === 'cleared' ? 'selected' : ''}>Cleared</option>
                         </select>
                     </td>
-                    <td class="py-4 px-6 text-right font-extrabold bg-ledger-highlight/30 border-l border-r border-slate-100/50 ${runningTotal < 0 ? 'text-rose-600' : 'text-slate-900'}">
-                        <span>$${runningTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
-                    </td>
-                    <td class="py-4 px-4 text-center">
-                        <div class="flex items-center justify-center space-x-1 opacity-0 group-hover:opacity-100 transition-all">
-                            <button onclick="openCommentModal('${txn.id}')" class="${commentBtnColor} bg-white hover:bg-brand-50 rounded-full p-2 shadow-sm transition-colors" title="Add/Edit Note"><i class="${txn.comment ? 'ph-fill' : 'ph-bold'} ph-chat-text text-lg"></i></button>
-                            <button onclick="deleteTransaction('${txn.id}')" class="text-slate-300 hover:text-rose-500 bg-white hover:bg-rose-50 rounded-full p-2 shadow-sm transition-colors"><i class="ph-bold ph-trash text-lg"></i></button>
-                        </div>
+                    <td class="py-4 px-6 text-right font-extrabold bg-slate-50/30">$${runningTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td class="py-4 px-6 text-center">
+                        <button onclick="deleteTxn('${t.id}')" class="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><i class="ph-bold ph-trash text-lg"></i></button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
+            
+            document.getElementById('metric-remaining').innerText = (remaining >= 0 ? '+' : '-') + '$' + Math.abs(remaining).toLocaleString(undefined, {minimumFractionDigits: 2});
+            const projected = state.bankBalance + remaining;
+            const projectedEl = document.getElementById('metric-projected');
+            projectedEl.innerText = '$' + projected.toLocaleString(undefined, {minimumFractionDigits: 2});
+            projectedEl.className = projected < 0 ? 'text-3xl font-extrabold mt-1 text-rose-400' : 'text-3xl font-extrabold mt-1 text-emerald-400';
 
-            document.getElementById('metric-remaining').innerText = `${remainingImpact >= 0 ? '+' : ''}$${remainingImpact.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-            const projectedEom = state.bankBalance + remainingImpact;
-            const projEl = document.getElementById('metric-projected');
-            projEl.innerText = `$${projectedEom.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-            projEl.className = projectedEom < 0 ? "text-3xl font-extrabold mt-1 tracking-tight z-10 text-rose-400" : "text-3xl font-extrabold mt-1 tracking-tight z-10 text-emerald-400";
-        }
-
-        window.updateStatus = function(id, newStatus) { setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), { status: newStatus }, { merge: true }); }
-        window.deleteTransaction = function(id) { if(confirm("Remove this entry completely?")) { deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', id)); } }
-        
-        window.openCommentModal = function(id) {
-            const txn = state.transactions.find(t => t.id === id);
-            if(!txn) return;
-            document.getElementById('edit-comment-id').value = id;
-            document.getElementById('edit-comment-text').value = txn.comment || '';
-            openModal('comment');
-        }
-
-        window.saveLedgerComment = function() {
-            const id = document.getElementById('edit-comment-id').value;
-            const text = document.getElementById('edit-comment-text').value;
-            setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), { comment: text }, { merge: true });
-            closeModal('comment');
-        }
-
-        // --- TEMPLATES ---
-        function setupWeeklyCheckboxes() {
-            document.getElementById('tpl-weekly-days').innerHTML = daysOfWeek.map(d => `
-                <label class="day-checkbox cursor-pointer relative"><input type="checkbox" value="${d.id}" class="peer sr-only tpl-day-val"><div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 border-slate-200 bg-white text-slate-500 font-bold transition-all peer-hover:border-brand-300">${d.label}</div></label>
-            `).join('');
-        }
-
-        function setupMonthlyGrid() {
-            let html = '';
-            for(let i=1; i<=31; i++) html += `<label class="day-checkbox cursor-pointer relative"><input type="checkbox" value="${i}" class="peer sr-only tpl-month-val"><div class="w-8 h-8 rounded-full flex items-center justify-center border border-slate-200 bg-white text-slate-600 text-xs font-bold transition-all hover:border-brand-300">${i}</div></label>`;
-            document.getElementById('tpl-monthly-grid').innerHTML = html;
-        }
-
-        window.toggleFrequencyUI = function() {
-            const freq = document.getElementById('tpl-frequency').value;
-            ['monthly', 'weekly', 'custom'].forEach(f => document.getElementById(`tpl-ui-${f}`).classList.add('hide'));
-            document.getElementById(`tpl-ui-${freq}`).classList.remove('hide');
-        }
-
-        window.addCustomDateToDraft = function() {
-            const m = document.getElementById('tpl-custom-mm').value.padStart(2, '0');
-            const d = document.getElementById('tpl-custom-dd').value.padStart(2, '0');
-            if(m > 0 && m <= 12 && d > 0 && d <= 31) {
-                const val = `${m}/${d}`;
-                if(!tempCustomDates.includes(val)) { tempCustomDates.push(val); renderDraftCustomDates(); }
-                document.getElementById('tpl-custom-mm').value = ''; document.getElementById('tpl-custom-dd').value = '';
-            }
-        }
-
-        window.removeCustomDate = function(val) { tempCustomDates = tempCustomDates.filter(d => d !== val); renderDraftCustomDates(); }
-        function renderDraftCustomDates() {
-            document.getElementById('draft-custom-dates').innerHTML = tempCustomDates.map(d => `
-                <div class="bg-brand-50 text-brand-700 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center shadow-sm border border-brand-100">${d} <button type="button" onclick="removeCustomDate('${d}')" class="ml-2 text-brand-400 hover:text-rose-500"><i class="ph-bold ph-x"></i></button></div>
-            `).join('');
-        }
-
-        window.setTemplateView = function(mode) {
-            state.templateViewMode = mode;
-            document.getElementById('btn-view-cat').className = mode === 'category' ? "px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-brand-600 shadow-sm transition-all" : "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all";
-            document.getElementById('btn-view-rec').className = mode === 'recurrence' ? "px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-brand-600 shadow-sm transition-all" : "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all";
             renderTemplates();
+            renderCharts(income, expense);
         }
 
         function renderTemplates() {
             const container = document.getElementById('templates-container');
             container.innerHTML = '';
-            let groups = {};
             state.templates.forEach(tpl => {
-                const groupKey = state.templateViewMode === 'category' ? tpl.category : (tpl.frequency.charAt(0).toUpperCase() + tpl.frequency.slice(1));
-                if(!groups[groupKey]) groups[groupKey] = [];
-                groups[groupKey].push(tpl);
+                const div = document.createElement('div');
+                div.className = "bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between";
+                div.innerHTML = `
+                    <div>
+                        <div class="flex justify-between mb-4"><span class="bg-brand-50 text-brand-600 px-2 py-1 rounded text-[10px] font-bold uppercase">${tpl.category}</span></div>
+                        <h3 class="font-bold text-slate-800 text-lg mb-1">${tpl.name}</h3>
+                        <div class="text-2xl font-extrabold text-slate-900">$${tpl.amount.toFixed(2)}</div>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-6">
+                        <button onclick="deleteTemplate('${tpl.id}')" class="text-slate-400 hover:text-rose-600"><i class="ph-bold ph-trash text-lg"></i></button>
+                    </div>
+                `;
+                container.appendChild(div);
             });
+        }
 
-            Object.keys(groups).sort().forEach(groupName => {
-                const section = document.createElement('div');
-                section.innerHTML = `<h3 class="font-extrabold text-slate-400 uppercase tracking-wider text-xs mb-4 border-b border-slate-200 pb-2">${groupName}</h3><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8" id="group-${groupName.replace(/\s+/g, '')}"></div>`;
-                container.appendChild(section);
-                const grid = section.querySelector('div');
-                groups[groupName].forEach(tpl => {
-                    const isExpense = tpl.type === 'withdrawal';
-                    const catColor = getCatColorClass(tpl.type, tpl.category);
-                    let freqText = "";
-                    if(tpl.frequency === 'monthly') freqText = `<i class="ph-fill ph-calendar-blank mr-1.5 text-slate-400"></i> Dates: ${tpl.monthlyDays.join(', ')}`;
-                    else if (tpl.frequency === 'weekly') freqText = `<i class="ph-fill ph-arrows-clockwise mr-1.5 text-slate-400"></i> Weekly on ${tpl.weeklyDays.map(dId => daysOfWeek.find(d => d.id === dId).label).join(', ')}`;
-                    else freqText = `<i class="ph-fill ph-calendar-star mr-1.5 text-slate-400"></i> Dates: ${tpl.customDates.join(', ')}`;
-
-                    const autoBadge = tpl.autoProcess ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold ml-2 uppercase tracking-wider flex items-center"><i class="ph-fill ph-lightning mr-1"></i> Auto</span>` : '';
-                    const detailsBox = tpl.details ? `<div class="mt-4 pt-4 border-t border-slate-100"><p class="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed"><i class="ph-fill ph-info text-brand-400 mr-1.5"></i>${tpl.details}</p></div>` : '';
-
-                    const div = document.createElement('div');
-                    div.className = 'bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group';
-                    div.innerHTML = `
-                        <div class="absolute -right-4 -top-4 w-24 h-24 bg-slate-50 rounded-full opacity-50 pointer-events-none"></div>
-                        <div class="relative z-10 flex-1">
-                            <div class="flex justify-between items-start mb-4">
-                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${catColor}">${tpl.category}</span>
-                                <div class="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onclick="editTemplate('${tpl.id}')" class="text-slate-400 hover:text-brand-600 bg-slate-50 hover:bg-brand-50 rounded-full p-2 transition-colors"><i class="ph-bold ph-pencil-simple"></i></button>
-                                    <button onclick="deleteTemplate('${tpl.id}')" class="text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 rounded-full p-2 transition-colors"><i class="ph-bold ph-trash"></i></button>
-                                </div>
-                            </div>
-                            <h3 class="font-extrabold text-lg text-slate-800 leading-tight mb-1 flex items-center flex-wrap">${tpl.name} ${autoBadge}</h3>
-                            <div class="text-3xl font-extrabold ${isExpense ? 'text-slate-900' : 'text-emerald-600'} mb-3 tracking-tight">${isExpense ? '' : '+'}$${tpl.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
-                            <p class="text-xs font-bold text-slate-500 flex items-center bg-slate-50 py-2 px-3 rounded-xl w-fit border border-slate-100">${freqText}</p>
-                            ${detailsBox}
-                        </div>
-                    `;
-                    grid.appendChild(div);
-                });
+        function renderCharts(income, expense) {
+            const ctx = document.getElementById('cashflowChart').getContext('2d');
+            if (cashflowChart) cashflowChart.destroy();
+            cashflowChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: ['Deposits', 'Withdrawals'], datasets: [{ data: [income, expense], backgroundColor: ['#10b981', '#f43f5e'], borderRadius: 12 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
             });
-            if(Object.keys(groups).length === 0) container.innerHTML = '<p class="text-slate-400 italic font-medium py-8">No rules created yet.</p>';
         }
 
-        async function cleanFutureUnprocessedTransactions(templateId) {
-            const firstOfCurrentMonthStr = `${REAL_CURRENT_DATE.getFullYear()}-${(REAL_CURRENT_DATE.getMonth()+1).toString().padStart(2,'0')}-01`;
-            const batch = writeBatch(db);
-            state.transactions.forEach(t => {
-                if(t.templateId === templateId && t.status === 'unprocessed' && t.date >= firstOfCurrentMonthStr) {
-                    batch.delete(doc(db, 'users', currentUser.uid, 'transactions', t.id));
-                }
-            });
-            await batch.commit();
-        }
-
-        window.deleteTemplate = async function(id) {
-            if(confirm("Delete rule? Future unprocessed items will be removed. Past months remain locked.")) {
-                await deleteDoc(doc(db, 'users', currentUser.uid, 'templates', id));
-                await cleanFutureUnprocessedTransactions(id);
-            }
-        }
-
-        window.editTemplate = function(id) {
-            const tpl = state.templates.find(t => t.id === id);
-            if(!tpl) return;
-            document.getElementById('form-template').reset();
-            document.getElementById('tpl-id').value = tpl.id;
-            document.getElementById('tpl-modal-title').innerText = "Edit Rule";
-            document.getElementById('tpl-save-btn').innerText = "Update Rule";
-            document.getElementById('tpl-name').value = tpl.name;
-            document.getElementById('tpl-type').value = tpl.type;
-            updateCategoryOptions('tpl-category', tpl.type);
-            document.getElementById('tpl-category').value = tpl.category;
-            document.getElementById('tpl-amount').value = tpl.amount;
-            document.getElementById('tpl-details').value = tpl.details || '';
-            document.getElementById('tpl-autoprocess').checked = tpl.autoProcess;
-            document.getElementById('tpl-frequency').value = tpl.frequency;
-            
-            toggleFrequencyUI();
-            document.querySelectorAll('.tpl-month-val, .tpl-day-val').forEach(cb => cb.checked = false);
-            tempCustomDates = []; renderDraftCustomDates();
-
-            if(tpl.frequency === 'monthly') tpl.monthlyDays.forEach(d => { const cb = document.querySelector(`.tpl-month-val[value="${d}"]`); if(cb) cb.checked = true; });
-            else if (tpl.frequency === 'weekly') tpl.weeklyDays.forEach(d => { const cb = document.querySelector(`.tpl-day-val[value="${d}"]`); if(cb) cb.checked = true; });
-            else { tempCustomDates = [...tpl.customDates]; renderDraftCustomDates(); }
-
-            openModal('template');
-        }
-
-        window.handleTransactionSubmit = function(e) {
-            e.preventDefault();
-            const txn = {
-                id: 't_' + Date.now(),
-                date: document.getElementById('txn-date').value,
-                name: document.getElementById('txn-name').value,
-                amount: parseFloat(document.getElementById('txn-amount').value),
-                type: document.getElementById('txn-type').value,
-                category: document.getElementById('txn-category').value,
-                status: 'unprocessed',
-                autoProcess: false,
-                comment: document.getElementById('txn-comment').value
-            };
-            setDoc(doc(db, 'users', currentUser.uid, 'transactions', txn.id), txn);
-            closeModal('transaction');
-        }
-
-        window.handleTemplateSubmit = async function(e) {
-            e.preventDefault();
-            const freq = document.getElementById('tpl-frequency').value;
-            const editId = document.getElementById('tpl-id').value;
-            
-            let tpl = {
-                id: editId ? editId : 'tpl_' + Date.now(),
-                name: document.getElementById('tpl-name').value,
-                amount: parseFloat(document.getElementById('tpl-amount').value),
-                type: document.getElementById('tpl-type').value,
-                category: document.getElementById('tpl-category').value,
-                frequency: freq,
-                autoProcess: document.getElementById('tpl-autoprocess').checked,
-                details: document.getElementById('tpl-details').value
-            };
-
-            if(freq === 'monthly') {
-                const checked = Array.from(document.querySelectorAll('.tpl-month-val:checked')).map(cb => parseInt(cb.value));
-                if(checked.length === 0) { alert("Select at least one date."); return; }
-                tpl.monthlyDays = checked.sort((a,b) => a-b);
-            } else if(freq === 'weekly') {
-                const checked = Array.from(document.querySelectorAll('.tpl-day-val:checked')).map(cb => parseInt(cb.value));
-                if(checked.length === 0) { alert("Select at least one day."); return; }
-                tpl.weeklyDays = checked;
-            } else {
-                if(tempCustomDates.length === 0) { alert("Add at least one specific date."); return; }
-                tpl.customDates = [...tempCustomDates];
-            }
-
-            if(editId) await cleanFutureUnprocessedTransactions(editId);
-            await setDoc(doc(db, 'users', currentUser.uid, 'templates', tpl.id), tpl);
-            closeModal('template');
-            
-            const firstOfCurrentMonthStr = `${REAL_CURRENT_DATE.getFullYear()}-${(REAL_CURRENT_DATE.getMonth()+1).toString().padStart(2,'0')}`;
-            state.initializedMonths.forEach(monthKey => {
-                if(monthKey >= firstOfCurrentMonthStr) {
-                    const [y, m] = monthKey.split('-');
-                    injectTemplateDatesForMonth(tpl, parseInt(y), parseInt(m)-1);
-                }
-            });
-            await processAutoClear();
-        }
-
-        // --- DASHBOARD & UTILS ---
-        function renderDashboard() {
-            const txns = getMonthlyTransactions();
-            let income = 0; let expense = 0; const expensesByCategory = {};
-            let runningTotal = 0; let trendLabels = []; let trendData = [];
-
-            txns.forEach(t => {
-                if(t.type === 'deposit') { income += t.amount; runningTotal += t.amount; } 
-                else { expense += t.amount; expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount; runningTotal -= t.amount; }
-                trendLabels.push(formatDate(t.date)); trendData.push(runningTotal);
-            });
-
-            if(cashflowChartObj) cashflowChartObj.destroy();
-            if(categoryChartObj) categoryChartObj.destroy();
-            if(balanceTrendChartObj) balanceTrendChartObj.destroy();
-
-            Chart.defaults.font.family = '"Plus Jakarta Sans", sans-serif';
-
-            const ctxTrend = document.getElementById('balanceTrendChart').getContext('2d');
-            let gradient = ctxTrend.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.2)'); 
-            gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
-            balanceTrendChartObj = new Chart(ctxTrend, {
-                type: 'line',
-                data: { labels: trendLabels, datasets: [{ label: 'Running Impact', data: trendData, borderColor: '#6366f1', backgroundColor: gradient, borderWidth: 3, pointBackgroundColor: '#fff', pointBorderColor: '#6366f1', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6, fill: true, tension: 0.3 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { border: {display: false}, grid: {color: '#f1f5f9'}, ticks: { callback: function(value) { return '$' + value; } } }, x: { border: {display: false}, grid: {display: false}, ticks: { maxTicksLimit: 10 } } } }
-            });
-
-            const ctxFlow = document.getElementById('cashflowChart').getContext('2d');
-            cashflowChartObj = new Chart(ctxFlow, { type: 'bar', data: { labels: ['Income', 'Withdrawals'], datasets: [{ data: [income, expense], backgroundColor: ['#10b981', '#f43f5e'], borderRadius: 8, barPercentage: 0.6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { border: {display: false}, grid: {color: '#f1f5f9'} }, x: { border: {display: false}, grid: {display: false} } } } });
-
-            const colorsCat = ['#4f46e5', '#ec4899', '#f59e0b', '#06b6d4', '#10b981', '#64748b', '#8b5cf6', '#a3e635'];
-            const ctxCat = document.getElementById('categoryChart').getContext('2d');
-            categoryChartObj = new Chart(ctxCat, { type: 'doughnut', data: { labels: Object.keys(expensesByCategory), datasets: [{ data: Object.values(expensesByCategory), backgroundColor: colorsCat, borderWidth: 0, hoverOffset: 4 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right', labels: { usePointStyle: true, padding: 20 } } } } });
-        }
-
-        window.switchTab = function(tabId) {
+        // HELPERS
+        window.switchTab = (tab) => {
             ['ledger', 'templates', 'dashboard'].forEach(t => {
                 document.getElementById(`view-${t}`).classList.add('hide');
-                const navEl = document.getElementById(`nav-${t}`);
-                if(navEl) { navEl.classList.remove('bg-brand-50', 'text-brand-600'); navEl.classList.add('text-slate-500'); }
+                document.getElementById(`nav-${t}`).classList.remove('bg-brand-50', 'text-brand-600');
+                document.getElementById(`nav-${t}`).classList.add('text-slate-500');
             });
-            document.getElementById(`view-${tabId}`).classList.remove('hide');
-            const activeNav = document.getElementById(`nav-${tabId}`);
-            if(activeNav) { activeNav.classList.add('bg-brand-50', 'text-brand-600'); activeNav.classList.remove('text-slate-500'); }
-            if(tabId === 'dashboard') renderDashboard();
-            if(tabId === 'templates') renderTemplates();
-        }
+            document.getElementById(`view-${tab}`).classList.remove('hide');
+            document.getElementById(`nav-${tab}`).classList.add('bg-brand-50', 'text-brand-600');
+            renderApp();
+        };
 
-        window.updateCategoryOptions = function(selectId, type) {
-            const select = document.getElementById(selectId);
-            const currentVal = select.value;
-            select.innerHTML = '';
-            categoryConfig[type].forEach(cat => { const opt = document.createElement('option'); opt.value = cat.name; opt.innerText = cat.name; select.appendChild(opt); });
-            if(categoryConfig[type].find(c => c.name === currentVal)) select.value = currentVal;
-        }
-
-        window.openModal = function(type) {
-            const modal = document.getElementById(`modal-${type}`);
-            modal.classList.remove('hidden'); modal.classList.add('flex');
-            setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10);
-        }
-
-        window.closeModal = function(type) {
-            const modal = document.getElementById(`modal-${type}`);
-            modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95');
-            setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); }, 300);
-        }
-
-        window.openTransactionModal = function() {
-            document.getElementById('form-transaction').reset();
-            const year = state.currentDate.getFullYear(); const month = (state.currentDate.getMonth() + 1).toString().padStart(2, '0');
-            document.getElementById('txn-date').value = `${year}-${month}-01`;
-            document.getElementById('txn-type').value = 'withdrawal'; updateCategoryOptions('txn-category', 'withdrawal');
-            openModal('transaction');
-        }
-
-        window.openTemplateModal = function() {
-            document.getElementById('form-template').reset();
-            document.getElementById('tpl-id').value = '';
-            document.getElementById('tpl-modal-title').innerText = "New Template";
-            document.getElementById('tpl-save-btn').innerText = "Save Rule";
-            tempCustomDates = []; renderDraftCustomDates();
-            document.getElementById('tpl-type').value = 'withdrawal'; updateCategoryOptions('tpl-category', 'withdrawal');
-            document.querySelectorAll('.tpl-month-val, .tpl-day-val').forEach(cb => cb.checked = false);
-            toggleFrequencyUI();
-            openModal('template');
-        }
-
-        function formatDate(dateStr) {
-            const [y, m, d] = dateStr.split('-');
-            const date = new Date(y, m - 1, d);
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        }
+        window.updateStatus = (id, status) => setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), { status }, { merge: true });
+        window.deleteTxn = (id) => { if(confirm("Delete this entry?")) deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', id)); };
+        window.updateBankBalance = (val) => setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { bankBalance: parseFloat(val) }, { merge: true });
+        window.changeMonth = (delta) => { state.currentDate.setMonth(state.currentDate.getMonth() + delta); renderApp(); };
+        window.openTransactionModal = () => { 
+            const d = new Date(); document.getElementById('txn-date').value = d.toISOString().split('T')[0];
+            document.getElementById('modal-transaction').classList.remove('hidden'); document.getElementById('modal-transaction').classList.add('flex'); setTimeout(() => { document.getElementById('modal-transaction').classList.remove('opacity-0'); document.getElementById('modal-transaction').querySelector('div').classList.remove('scale-95'); }, 10); 
+        };
+        window.closeModal = (id) => { document.getElementById('modal-' + id).classList.add('opacity-0'); document.getElementById('modal-' + id).querySelector('div').classList.add('scale-95'); setTimeout(() => document.getElementById('modal-' + id).classList.add('hidden'), 300); };
+        window.handleTransactionSubmit = async (e) => {
+            e.preventDefault();
+            const id = 't_' + Date.now();
+            const txn = { id, date: document.getElementById('txn-date').value, name: document.getElementById('txn-name').value, amount: parseFloat(document.getElementById('txn-amount').value), type: document.getElementById('txn-type').value, category: document.getElementById('txn-category').value, status: 'unprocessed' };
+            await setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), txn);
+            closeModal('transaction');
+        };
     </script>
 </body>
 </html>
+
