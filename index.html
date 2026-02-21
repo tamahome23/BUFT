@@ -148,7 +148,10 @@
                     <i class="ph-bold ph-chart-polar text-2xl lg:text-xl"></i><span class="hidden lg:block">Insights</span>
                 </button>
                 
-                <div class="mt-auto pt-4 border-t border-slate-100">
+                <div class="mt-auto pt-4 border-t border-slate-100 space-y-2">
+                    <button onclick="openModal('settings')" class="w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-700 font-semibold transition-all">
+                        <i class="ph-bold ph-gear-six text-2xl lg:text-xl"></i><span class="hidden lg:block">Settings</span>
+                    </button>
                     <button onclick="logoutUser()" class="w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600 font-semibold transition-all">
                         <i class="ph-bold ph-sign-out text-2xl lg:text-xl"></i><span class="hidden lg:block">Sign Out</span>
                     </button>
@@ -161,6 +164,7 @@
             <button onclick="switchTab('ledger')" class="flex flex-col items-center p-2 text-brand-600"><i class="ph-bold ph-list-numbers text-2xl mb-1"></i><span class="text-[10px] font-bold uppercase tracking-wider">Ledger</span></button>
             <button onclick="switchTab('templates')" class="flex flex-col items-center p-2 text-slate-400"><i class="ph-bold ph-calendar-plus text-2xl mb-1"></i><span class="text-[10px] font-bold uppercase tracking-wider">Templates</span></button>
             <button onclick="switchTab('dashboard')" class="flex flex-col items-center p-2 text-slate-400"><i class="ph-bold ph-chart-polar text-2xl mb-1"></i><span class="text-[10px] font-bold uppercase tracking-wider">Insights</span></button>
+            <button onclick="openModal('settings')" class="flex flex-col items-center p-2 text-slate-400"><i class="ph-bold ph-gear-six text-2xl mb-1"></i><span class="text-[10px] font-bold uppercase tracking-wider">Settings</span></button>
         </div>
 
         <main class="flex-1 flex flex-col h-full overflow-hidden relative">
@@ -433,11 +437,42 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="modal-settings" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[100] px-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 class="font-extrabold text-lg text-slate-800"><i class="ph-bold ph-gear-six mr-2 text-slate-500"></i>Settings</h3>
+                <button onclick="closeModal('settings')" class="text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-100 rounded-full p-1.5 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-6">
+                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-1 flex items-center"><i class="ph-bold ph-download-simple mr-2 text-brand-500"></i>Export Data</h4>
+                    <p class="text-xs text-slate-500 mb-4">Download all your templates, transactions, and settings as a JSON backup file.</p>
+                    <button onclick="exportData()" class="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold shadow-md transition-all flex items-center justify-center">
+                        <i class="ph-bold ph-file-arrow-down mr-2 text-lg"></i> Export Backup
+                    </button>
+                </div>
+                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-1 flex items-center"><i class="ph-bold ph-upload-simple mr-2 text-amber-500"></i>Import Data</h4>
+                    <p class="text-xs text-slate-500 mb-2">Restore from a previously exported backup file.</p>
+                    <div class="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-4">
+                        <p class="text-[11px] font-bold text-rose-700 flex items-center"><i class="ph-fill ph-warning mr-1.5"></i>This will wipe all existing data and replace it with the backup.</p>
+                    </div>
+                    <label class="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl font-bold shadow-md transition-all flex items-center justify-center cursor-pointer">
+                        <i class="ph-bold ph-file-arrow-up mr-2 text-lg"></i> Choose Backup File
+                        <input type="file" accept=".json" onchange="importData(event)" class="hidden">
+                    </label>
+                    <div id="import-status" class="mt-3 text-center text-sm font-bold hidden"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- FIREBASE CLOUD ENGINE SCRIPT -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { initializeFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase Config
         const firebaseConfig = {
@@ -1269,6 +1304,118 @@
         function formatDate(dateStr) {
             const [y, m, d] = dateStr.split('-');
             return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        // --- EXPORT / IMPORT ---
+        window.exportData = function() {
+            const backup = {
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                settings: {
+                    bankBalance: state.bankBalance,
+                    initializedMonths: state.initializedMonths
+                },
+                templates: state.templates,
+                transactions: state.transactions
+            };
+            const json = JSON.stringify(backup, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const dateStr = new Date().toISOString().split('T')[0];
+            a.href = url;
+            a.download = `buft-backup-${dateStr}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        window.importData = async function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const statusEl = document.getElementById('import-status');
+
+            try {
+                const text = await file.text();
+                const backup = JSON.parse(text);
+
+                // Validate structure
+                if (!backup.settings || !Array.isArray(backup.templates) || !Array.isArray(backup.transactions)) {
+                    statusEl.textContent = 'Invalid backup file format.';
+                    statusEl.className = 'mt-3 text-center text-sm font-bold text-rose-600';
+                    statusEl.classList.remove('hidden');
+                    event.target.value = '';
+                    return;
+                }
+
+                if (!confirm(`This will WIPE all existing data and restore from backup (${backup.exportedAt || 'unknown date'}).\n\n${backup.templates.length} templates, ${backup.transactions.length} transactions.\n\nContinue?`)) {
+                    event.target.value = '';
+                    return;
+                }
+
+                statusEl.textContent = 'Wiping existing data...';
+                statusEl.className = 'mt-3 text-center text-sm font-bold text-amber-600';
+                statusEl.classList.remove('hidden');
+
+                const uid = currentUser.uid;
+
+                // Wipe existing transactions
+                const txnSnap = await getDocs(collection(db, 'users', uid, 'transactions'));
+                let wipeBatch = writeBatch(db);
+                let batchCount = 0;
+                for (const d of txnSnap.docs) {
+                    wipeBatch.delete(d.ref);
+                    batchCount++;
+                    if (batchCount >= 400) { await wipeBatch.commit(); wipeBatch = writeBatch(db); batchCount = 0; }
+                }
+
+                // Wipe existing templates
+                const tplSnap = await getDocs(collection(db, 'users', uid, 'templates'));
+                for (const d of tplSnap.docs) {
+                    wipeBatch.delete(d.ref);
+                    batchCount++;
+                    if (batchCount >= 400) { await wipeBatch.commit(); wipeBatch = writeBatch(db); batchCount = 0; }
+                }
+                if (batchCount > 0) await wipeBatch.commit();
+
+                statusEl.textContent = 'Restoring backup...';
+
+                // Write settings
+                await setDoc(doc(db, 'users', uid, 'settings', 'main'), {
+                    bankBalance: backup.settings.bankBalance || 0,
+                    initializedMonths: backup.settings.initializedMonths || [],
+                    hasAcceptedTerms: true
+                });
+
+                // Write templates in batches
+                let restoreBatch = writeBatch(db);
+                batchCount = 0;
+                for (const tpl of backup.templates) {
+                    restoreBatch.set(doc(db, 'users', uid, 'templates', tpl.id), tpl);
+                    batchCount++;
+                    if (batchCount >= 400) { await restoreBatch.commit(); restoreBatch = writeBatch(db); batchCount = 0; }
+                }
+
+                // Write transactions in batches
+                for (const txn of backup.transactions) {
+                    restoreBatch.set(doc(db, 'users', uid, 'transactions', txn.id), txn);
+                    batchCount++;
+                    if (batchCount >= 400) { await restoreBatch.commit(); restoreBatch = writeBatch(db); batchCount = 0; }
+                }
+                if (batchCount > 0) await restoreBatch.commit();
+
+                statusEl.textContent = 'Restore complete! Reloading...';
+                statusEl.className = 'mt-3 text-center text-sm font-bold text-emerald-600';
+                setTimeout(() => location.reload(), 1500);
+
+            } catch (err) {
+                console.error('Import error:', err);
+                statusEl.textContent = 'Import failed: ' + err.message;
+                statusEl.className = 'mt-3 text-center text-sm font-bold text-rose-600';
+                statusEl.classList.remove('hidden');
+            }
+            event.target.value = '';
         }
 
         // --- INIT: Must run AFTER all window.xxx assignments above ---
