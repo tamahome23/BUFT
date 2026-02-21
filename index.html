@@ -497,7 +497,17 @@
         async function setupCloudSync() {
             const uid = currentUser.uid;
             const settingsRef = doc(db, 'users', uid, 'settings', 'main');
-            
+
+            // Safety timeout: if data hasn't loaded in 15 seconds, force-hide the loader
+            // so the user isn't stuck forever on iPad
+            const safetyTimer = setTimeout(() => {
+                console.warn("BUFT: Safety timeout hit - forcing loader off");
+                const loader = document.getElementById('data-loader');
+                if (loader && !loader.classList.contains('hidden')) {
+                    loader.classList.add('hidden');
+                }
+            }, 15000);
+
             // --- SELF-HEALING: Check for existence immediately to prevent the "Syncing" loop ---
             try {
                 const snap = await getDoc(settingsRef);
@@ -513,50 +523,58 @@
                         state.hasAcceptedTerms = docSnap.data().hasAcceptedTerms || false;
                     }
                     dataLoaded.settings = true;
-                    checkReadyToInit();
+                    checkReadyToInit(safetyTimer);
                 }, (err) => console.error("Database connection error:", err));
 
                 onSnapshot(collection(db, 'users', uid, 'templates'), (snapshot) => {
                     let tpls = [];
-                    snapshot.forEach(doc => tpls.push(doc.data()));
+                    snapshot.forEach(d => tpls.push(d.data()));
                     state.templates = tpls;
                     dataLoaded.tpls = true;
-                    checkReadyToInit();
+                    checkReadyToInit(safetyTimer);
                 });
 
                 onSnapshot(collection(db, 'users', uid, 'transactions'), (snapshot) => {
                     let txns = [];
-                    snapshot.forEach(doc => txns.push(doc.data()));
+                    snapshot.forEach(d => txns.push(d.data()));
                     state.transactions = txns;
                     dataLoaded.txns = true;
-                    checkReadyToInit();
+                    checkReadyToInit(safetyTimer);
                 });
             } catch (err) {
                 console.error("Initial Cloud Connection Failure:", err);
+                clearTimeout(safetyTimer);
+                // Force-hide loader on connection failure so user isn't stuck
+                document.getElementById('data-loader').classList.add('hidden');
             }
         }
 
-        async function checkReadyToInit() {
-            if (dataLoaded.settings && dataLoaded.txns && dataLoaded.tpls) {
-                if (!hasInitializedCore) {
-                    // THE BOUNCER CHECK
-                    if (!state.hasAcceptedTerms) {
-                        document.getElementById('data-loader').classList.add('hidden');
-                        const gate = document.getElementById('access-gate-overlay');
-                        gate.classList.remove('hidden');
-                        setTimeout(() => gate.classList.remove('opacity-0'), 10);
-                        return; 
-                    }
-                    hasInitializedCore = true;
+        async function checkReadyToInit(safetyTimer) {
+            if (!(dataLoaded.settings && dataLoaded.txns && dataLoaded.tpls)) return;
+
+            if (!hasInitializedCore) {
+                // THE BOUNCER CHECK
+                if (!state.hasAcceptedTerms) {
                     document.getElementById('data-loader').classList.add('hidden');
-                    document.getElementById('access-gate-overlay').classList.add('hide');
+                    const gate = document.getElementById('access-gate-overlay');
+                    gate.classList.remove('hidden');
+                    setTimeout(() => gate.classList.remove('opacity-0'), 10);
+                    return;
+                }
+                hasInitializedCore = true;
+                if (safetyTimer) clearTimeout(safetyTimer);
+                document.getElementById('data-loader').classList.add('hidden');
+                const gate = document.getElementById('access-gate-overlay');
+                gate.classList.add('opacity-0');
+                setTimeout(() => { gate.classList.add('hidden'); gate.classList.remove('flex'); }, 300);
+                try {
                     await initializeMonth(state.currentDate.getFullYear(), state.currentDate.getMonth());
                     await processAutoClear();
-                    renderApp();
-                    scrollToTodayDivider();
-                } else {
-                    renderApp();
-                }
+                } catch(e) { console.error("Init month error:", e); }
+                renderApp();
+                scrollToTodayDivider();
+            } else {
+                renderApp();
             }
         }
 
@@ -919,6 +937,87 @@
 
             const ctxCat = document.getElementById('categoryChart').getContext('2d');
             categoryChartObj = new Chart(ctxCat, { type: 'doughnut', data: { labels: Object.keys(expensesByCategory), datasets: [{ data: Object.values(expensesByCategory), backgroundColor: ['#4f46e5', '#ec4899', '#f59e0b', '#06b6d4', '#10b981', '#64748b'] }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right' } } } });
+        }
+
+        // --- MISSING CRITICAL FUNCTIONS: Status, Delete, Edit, Comments ---
+        window.updateStatus = function(txnId, newStatus) {
+            setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), { status: newStatus }, { merge: true });
+        }
+
+        window.deleteTransaction = async function(txnId) {
+            if (!confirm('Delete this ledger entry?')) return;
+            await deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId));
+        }
+
+        window.deleteTemplate = async function(tplId) {
+            if (!confirm('Delete this recurring rule? Future months will no longer generate entries from it.')) return;
+            await deleteDoc(doc(db, 'users', currentUser.uid, 'templates', tplId));
+        }
+
+        window.editTemplate = function(tplId) {
+            const tpl = state.templates.find(t => t.id === tplId);
+            if (!tpl) return;
+            document.getElementById('tpl-id').value = tpl.id;
+            document.getElementById('tpl-name').value = tpl.name;
+            document.getElementById('tpl-amount').value = tpl.amount;
+            document.getElementById('tpl-type').value = tpl.type;
+            updateCategoryOptions('tpl-category', tpl.type);
+            document.getElementById('tpl-category').value = tpl.category;
+            document.getElementById('tpl-details').value = tpl.details || '';
+            document.getElementById('tpl-autoprocess').checked = tpl.autoProcess || false;
+            document.getElementById('tpl-frequency').value = tpl.frequency;
+            document.getElementById('tpl-modal-title').innerText = 'Edit Template';
+            toggleFrequencyUI();
+
+            // Reset all checkboxes first
+            document.querySelectorAll('.tpl-month-val, .tpl-day-val').forEach(cb => cb.checked = false);
+            tempCustomDates = [];
+
+            if (tpl.frequency === 'monthly' && tpl.monthlyDays) {
+                tpl.monthlyDays.forEach(day => {
+                    const cb = document.querySelector(`.tpl-month-val[value="${day}"]`);
+                    if (cb) cb.checked = true;
+                });
+            } else if (tpl.frequency === 'weekly' && tpl.weeklyDays) {
+                tpl.weeklyDays.forEach(day => {
+                    const cb = document.querySelector(`.tpl-day-val[value="${day}"]`);
+                    if (cb) cb.checked = true;
+                });
+            } else if (tpl.frequency === 'custom' && tpl.customDates) {
+                tempCustomDates = [...tpl.customDates];
+                renderDraftCustomDates();
+            }
+
+            openModal('template');
+        }
+
+        window.openCommentModal = function(txnId) {
+            const txn = state.transactions.find(t => t.id === txnId);
+            if (!txn) return;
+            document.getElementById('edit-comment-id').value = txnId;
+            document.getElementById('edit-comment-text').value = txn.comment || '';
+            openModal('comment');
+        }
+
+        window.saveLedgerComment = function() {
+            const txnId = document.getElementById('edit-comment-id').value;
+            const text = document.getElementById('edit-comment-text').value.trim();
+            setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), { comment: text }, { merge: true });
+            closeModal('comment');
+        }
+
+        window.setTemplateView = function(mode) {
+            state.templateViewMode = mode;
+            const btnCat = document.getElementById('btn-view-cat');
+            const btnRec = document.getElementById('btn-view-rec');
+            if (mode === 'category') {
+                btnCat.className = 'px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-brand-600 shadow-sm transition-all';
+                btnRec.className = 'px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all';
+            } else {
+                btnRec.className = 'px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-brand-600 shadow-sm transition-all';
+                btnCat.className = 'px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all';
+            }
+            renderTemplates();
         }
 
         // --- ACTIONS & NAVIGATION ---
