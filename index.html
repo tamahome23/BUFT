@@ -728,51 +728,6 @@
             await batch.commit();
         }
 
-        async function syncTemplateTransactions(tpl) {
-            const batch = writeBatch(db);
-            let needsCommit = false;
-
-            // Ensure current viewed month is always included even if initializedMonths is stale
-            const currentMonthKey = getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
-            const monthsToSync = [...new Set([...state.initializedMonths, currentMonthKey])];
-
-            monthsToSync.forEach(monthKey => {
-                const [y, m] = monthKey.split('-').map(Number);
-                const expectedDates = new Set(getTemplateDatesForMonth(tpl, y, m - 1));
-
-                // Existing transactions for this template in this month
-                const existing = state.transactions.filter(t => t.templateId === tpl.id && t.date.startsWith(monthKey));
-
-                existing.forEach(txn => {
-                    if (txn.status === 'unprocessed') {
-                        if (!expectedDates.has(txn.date)) {
-                            // Date no longer in template schedule — remove it
-                            batch.delete(doc(db, 'users', currentUser.uid, 'transactions', txn.id));
-                            needsCommit = true;
-                        } else {
-                            // Date still valid — update name/amount/category in case template was edited
-                            batch.update(doc(db, 'users', currentUser.uid, 'transactions', txn.id), {
-                                name: tpl.name, amount: tpl.amount, type: tpl.type,
-                                category: tpl.category, autoProcess: tpl.autoProcess || false
-                            });
-                            needsCommit = true;
-                        }
-                    }
-                });
-
-                // Create transactions for dates that have no entry yet
-                const existingDates = new Set(existing.map(t => t.date));
-                expectedDates.forEach(dateStr => {
-                    if (!existingDates.has(dateStr)) {
-                        const id = `tplgen_${tpl.id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
-                        const txn = { id, templateId: tpl.id, date: dateStr, name: tpl.name, amount: tpl.amount, type: tpl.type, category: tpl.category, status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: '' };
-                        batch.set(doc(db, 'users', currentUser.uid, 'transactions', id), txn);
-                        needsCommit = true;
-                    }
-                });
-            });
-            if (needsCommit) await batch.commit();
-        }
 
         async function processAutoClear() {
             const todayStr = REAL_CURRENT_DATE.toISOString().split('T')[0];
@@ -1133,6 +1088,7 @@
 
         window.handleTemplateSubmit = async function(e) {
             e.preventDefault();
+            const isEdit = !!document.getElementById('tpl-id').value;
             const id = document.getElementById('tpl-id').value || 'tpl_' + Date.now();
             const freq = document.getElementById('tpl-frequency').value;
             let tpl = { id, name: document.getElementById('tpl-name').value, amount: parseFloat(document.getElementById('tpl-amount').value), type: document.getElementById('tpl-type').value, category: document.getElementById('tpl-category').value, frequency: freq, autoProcess: document.getElementById('tpl-autoprocess').checked, details: document.getElementById('tpl-details').value };
@@ -1140,11 +1096,41 @@
             else if(freq === 'weekly') tpl.weeklyDays = Array.from(document.querySelectorAll('.tpl-day-val:checked')).map(cb => parseInt(cb.value));
             else tpl.customDates = [...tempCustomDates];
 
+            // 1. Save template
             await setDoc(doc(db, 'users', currentUser.uid, 'templates', id), tpl);
             closeModal('template');
-            try {
-                await syncTemplateTransactions(tpl);
-            } catch(e) { console.error("Template sync error:", e); }
+
+            // 2. Create ledger entries — use direct setDoc (not batch) for reliability
+            const currentMonthKey = getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
+            const monthsToSync = [...new Set([...state.initializedMonths, currentMonthKey])];
+
+            for (const monthKey of monthsToSync) {
+                const [y, m] = monthKey.split('-').map(Number);
+                const dates = getTemplateDatesForMonth(tpl, y, m - 1);
+                const existingTxns = state.transactions.filter(t => t.templateId === id && t.date.startsWith(monthKey));
+                const existingDates = new Set(existingTxns.map(t => t.date));
+
+                // For edits: delete unprocessed txns on dates no longer in schedule
+                if (isEdit) {
+                    for (const txn of existingTxns) {
+                        if (txn.status === 'unprocessed' && !new Set(dates).has(txn.date)) {
+                            await deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', txn.id));
+                        }
+                    }
+                }
+
+                // Create missing entries
+                for (const dateStr of dates) {
+                    if (!existingDates.has(dateStr)) {
+                        const txnId = `tplgen_${id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
+                        await setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), {
+                            id: txnId, templateId: id, date: dateStr, name: tpl.name,
+                            amount: tpl.amount, type: tpl.type, category: tpl.category,
+                            status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: ''
+                        });
+                    }
+                }
+            }
             renderApp();
         }
 
