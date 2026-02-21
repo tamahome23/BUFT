@@ -1086,9 +1086,8 @@
             closeModal('transaction');
         }
 
-        window.handleTemplateSubmit = async function(e) {
+        window.handleTemplateSubmit = function(e) {
             e.preventDefault();
-            const isEdit = !!document.getElementById('tpl-id').value;
             const id = document.getElementById('tpl-id').value || 'tpl_' + Date.now();
             const freq = document.getElementById('tpl-frequency').value;
             let tpl = { id, name: document.getElementById('tpl-name').value, amount: parseFloat(document.getElementById('tpl-amount').value), type: document.getElementById('tpl-type').value, category: document.getElementById('tpl-category').value, frequency: freq, autoProcess: document.getElementById('tpl-autoprocess').checked, details: document.getElementById('tpl-details').value };
@@ -1096,42 +1095,24 @@
             else if(freq === 'weekly') tpl.weeklyDays = Array.from(document.querySelectorAll('.tpl-day-val:checked')).map(cb => parseInt(cb.value));
             else tpl.customDates = [...tempCustomDates];
 
-            // 1. Save template
-            await setDoc(doc(db, 'users', currentUser.uid, 'templates', id), tpl);
+            // Save template (fire-and-forget — same pattern as handleTransactionSubmit)
+            setDoc(doc(db, 'users', currentUser.uid, 'templates', id), tpl);
+
+            // Create ledger entries for current month (fire-and-forget)
+            const year = state.currentDate.getFullYear();
+            const month = state.currentDate.getMonth();
+            getTemplateDatesForMonth(tpl, year, month).forEach(dateStr => {
+                if (!state.transactions.some(t => t.templateId === id && t.date === dateStr)) {
+                    const txnId = `tplgen_${id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
+                    setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), {
+                        id: txnId, templateId: id, date: dateStr, name: tpl.name,
+                        amount: tpl.amount, type: tpl.type, category: tpl.category,
+                        status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: ''
+                    });
+                }
+            });
+
             closeModal('template');
-
-            // 2. Create ledger entries — use direct setDoc (not batch) for reliability
-            const currentMonthKey = getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
-            const monthsToSync = [...new Set([...state.initializedMonths, currentMonthKey])];
-
-            for (const monthKey of monthsToSync) {
-                const [y, m] = monthKey.split('-').map(Number);
-                const dates = getTemplateDatesForMonth(tpl, y, m - 1);
-                const existingTxns = state.transactions.filter(t => t.templateId === id && t.date.startsWith(monthKey));
-                const existingDates = new Set(existingTxns.map(t => t.date));
-
-                // For edits: delete unprocessed txns on dates no longer in schedule
-                if (isEdit) {
-                    for (const txn of existingTxns) {
-                        if (txn.status === 'unprocessed' && !new Set(dates).has(txn.date)) {
-                            await deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', txn.id));
-                        }
-                    }
-                }
-
-                // Create missing entries
-                for (const dateStr of dates) {
-                    if (!existingDates.has(dateStr)) {
-                        const txnId = `tplgen_${id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
-                        await setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), {
-                            id: txnId, templateId: id, date: dateStr, name: tpl.name,
-                            amount: tpl.amount, type: tpl.type, category: tpl.category,
-                            status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: ''
-                        });
-                    }
-                }
-            }
-            renderApp();
         }
 
         function getMonthlyTransactions() {
