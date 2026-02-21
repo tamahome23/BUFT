@@ -503,8 +503,8 @@
             const safetyTimer = setTimeout(() => {
                 console.warn("BUFT: Safety timeout hit - forcing loader off");
                 const loader = document.getElementById('data-loader');
-                if (loader && !loader.classList.contains('hidden')) {
-                    loader.classList.add('hidden');
+                if (loader && !loader.classList.contains('hide')) {
+                    loader.classList.add('hide');
                 }
             }, 15000);
 
@@ -545,7 +545,7 @@
                 console.error("Initial Cloud Connection Failure:", err);
                 clearTimeout(safetyTimer);
                 // Force-hide loader on connection failure so user isn't stuck
-                document.getElementById('data-loader').classList.add('hidden');
+                document.getElementById('data-loader').classList.add('hide');
             }
         }
 
@@ -555,7 +555,7 @@
             if (!hasInitializedCore) {
                 // THE BOUNCER CHECK
                 if (!state.hasAcceptedTerms) {
-                    document.getElementById('data-loader').classList.add('hidden');
+                    document.getElementById('data-loader').classList.add('hide');
                     const gate = document.getElementById('access-gate-overlay');
                     gate.classList.remove('hidden');
                     setTimeout(() => gate.classList.remove('opacity-0'), 10);
@@ -563,7 +563,7 @@
                 }
                 hasInitializedCore = true;
                 if (safetyTimer) clearTimeout(safetyTimer);
-                document.getElementById('data-loader').classList.add('hidden');
+                document.getElementById('data-loader').classList.add('hide');
                 const gate = document.getElementById('access-gate-overlay');
                 gate.classList.add('opacity-0');
                 setTimeout(() => { gate.classList.add('hidden'); gate.classList.remove('flex'); }, 300);
@@ -589,7 +589,7 @@
                 const gate = document.getElementById('access-gate-overlay');
                 gate.classList.add('opacity-0');
                 setTimeout(() => { gate.classList.add('hidden'); }, 300);
-                document.getElementById('data-loader').classList.add('hidden');
+                document.getElementById('data-loader').classList.add('hide');
                 try {
                     await initializeMonth(state.currentDate.getFullYear(), state.currentDate.getMonth());
                     await processAutoClear();
@@ -624,11 +624,6 @@
 
         let tempCustomDates = []; 
         let cashflowChartObj = null; let categoryChartObj = null; let balanceTrendChartObj = null;
-
-        setupWeeklyCheckboxes();
-        setupMonthlyGrid();
-        updateCategoryOptions('txn-category', 'withdrawal');
-        updateCategoryOptions('tpl-category', 'withdrawal');
 
         function getCatColorClass(type, catName) {
             const list = categoryConfig[type] || [];
@@ -1110,6 +1105,12 @@
             const [y, m, d] = dateStr.split('-');
             return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
+
+        // --- INIT: Must run AFTER all window.xxx assignments above ---
+        setupWeeklyCheckboxes();
+        setupMonthlyGrid();
+        updateCategoryOptions('txn-category', 'withdrawal');
+        updateCategoryOptions('tpl-category', 'withdrawal');
     </script>
 </body>
 </html>
