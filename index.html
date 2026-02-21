@@ -397,12 +397,18 @@
                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Recurrence Pattern</label>
                     <select id="tpl-frequency" onchange="toggleFrequencyUI()" class="w-full border border-slate-200 rounded-xl px-4 py-2 mb-4 outline-none text-slate-700 font-bold bg-slate-50 cursor-pointer">
                         <option value="monthly">Monthly (Dates of Month)</option>
+                        <option value="biweekly">Bi-Weekly (Every 2 Weeks)</option>
                         <option value="weekly">Weekly (Days of Week)</option>
                         <option value="custom">Specific Dates (Yearly)</option>
                     </select>
                     <div id="tpl-ui-monthly" class="transition-all">
                         <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Select Dates</label>
                         <div class="grid grid-cols-7 gap-1.5" id="tpl-monthly-grid"></div>
+                    </div>
+                    <div id="tpl-ui-biweekly" class="hide transition-all">
+                        <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Anchor Date (first occurrence)</label>
+                        <input type="date" id="tpl-anchor-date" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-medium bg-slate-50">
+                        <p class="text-[10px] text-slate-400 mt-2">Pick any date this item occurs. Every 14 days will be calculated from it.</p>
                     </div>
                     <div id="tpl-ui-weekly" class="hide transition-all">
                         <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Select Days</label>
@@ -705,6 +711,20 @@
                     if (tpl.weeklyDays.includes(date.getDay())) dates.push(`${year}-${monthStr}-${date.getDate().toString().padStart(2, '0')}`);
                     date.setDate(date.getDate() + 1);
                 }
+            } else if (tpl.frequency === 'biweekly' && tpl.anchorDate) {
+                const anchor = new Date(tpl.anchorDate + 'T00:00:00');
+                const firstOfMonth = new Date(year, monthIndex, 1);
+                const lastOfMonth = new Date(year, monthIndex + 1, 0);
+                const msPerDay = 86400000;
+                const diffDays = Math.round((firstOfMonth - anchor) / msPerDay);
+                const mod = ((diffDays % 14) + 14) % 14;
+                const startOffset = mod === 0 ? 0 : 14 - mod;
+                let d = new Date(firstOfMonth);
+                d.setDate(d.getDate() + startOffset);
+                while (d <= lastOfMonth) {
+                    dates.push(`${year}-${monthStr}-${d.getDate().toString().padStart(2, '0')}`);
+                    d.setDate(d.getDate() + 14);
+                }
             } else if (tpl.frequency === 'custom' && Array.isArray(tpl.customDates)) {
                 tpl.customDates.forEach(cd => {
                     const [m, d] = cd.split('/');
@@ -748,13 +768,18 @@
         }
 
         // --- LEDGER ---
+        // Helper: current month key for past-month protection
+        const CURRENT_MONTH_KEY = getMonthKey(REAL_CURRENT_DATE.getFullYear(), REAL_CURRENT_DATE.getMonth());
+
         function renderLedger() {
             const tbody = document.getElementById('ledger-body');
             tbody.innerHTML = '';
-            
+
             const txns = getMonthlyTransactions();
             let runningTotal = 0; let remainingImpact = 0;
             const todayStr = REAL_CURRENT_DATE.toISOString().split('T')[0];
+            const viewingMonthKey = getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
+            const isViewingPastMonth = viewingMonthKey < CURRENT_MONTH_KEY;
 
             if(txns.length === 0) tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400 font-medium italic">No entries for this month. Templates will populate on first view.</td></tr>`;
 
@@ -822,8 +847,8 @@
                     <td class="py-4 px-4 text-center">
                         <div class="flex items-center justify-center space-x-1">
                             <button onclick="openCommentModal('${txn.id}')" class="${commentBtnColor} bg-white hover:bg-brand-50 rounded-full p-1.5 shadow-sm transition-colors" title="Add/Edit Note"><i class="${txn.comment ? 'ph-fill' : 'ph-bold'} ph-chat-text"></i></button>
-                            <button onclick="editTransaction('${txn.id}')" class="text-slate-300 hover:text-brand-500 bg-white hover:bg-brand-50 rounded-full p-1.5 shadow-sm transition-colors" title="Edit Entry"><i class="ph-bold ph-pencil-simple"></i></button>
-                            <button onclick="deleteTransaction('${txn.id}')" class="text-slate-300 hover:text-rose-500 bg-white hover:bg-rose-50 rounded-full p-1.5 shadow-sm transition-colors" title="Delete Entry"><i class="ph-bold ph-trash"></i></button>
+                            ${isViewingPastMonth ? '' : `<button onclick="editTransaction('${txn.id}')" class="text-slate-300 hover:text-brand-500 bg-white hover:bg-brand-50 rounded-full p-1.5 shadow-sm transition-colors" title="Edit Entry"><i class="ph-bold ph-pencil-simple"></i></button>
+                            <button onclick="deleteTransaction('${txn.id}')" class="text-slate-300 hover:text-rose-500 bg-white hover:bg-rose-50 rounded-full p-1.5 shadow-sm transition-colors" title="Delete Entry"><i class="ph-bold ph-trash"></i></button>`}
                         </div>
                     </td>
                 `;
@@ -854,7 +879,7 @@
 
         window.toggleFrequencyUI = function() {
             const freq = document.getElementById('tpl-frequency').value;
-            ['monthly', 'weekly', 'custom'].forEach(f => document.getElementById(`tpl-ui-${f}`).classList.add('hide'));
+            ['monthly', 'biweekly', 'weekly', 'custom'].forEach(f => document.getElementById(`tpl-ui-${f}`).classList.add('hide'));
             document.getElementById(`tpl-ui-${freq}`).classList.remove('hide');
         }
 
@@ -893,7 +918,11 @@
                 groups[groupName].forEach(tpl => {
                     const isExpense = tpl.type === 'withdrawal';
                     const catColor = getCatColorClass(tpl.type, tpl.category);
-                    let freqText = tpl.frequency === 'monthly' ? `Dates: ${tpl.monthlyDays.join(', ')}` : (tpl.frequency === 'weekly' ? `Weekly: ${tpl.weeklyDays.map(d => daysOfWeek.find(x => x.id === d).label).join(', ')}` : `Custom: ${tpl.customDates.join(', ')}`);
+                    let freqText = '';
+                    if (tpl.frequency === 'monthly') freqText = `Dates: ${tpl.monthlyDays.join(', ')}`;
+                    else if (tpl.frequency === 'biweekly') freqText = `Bi-Weekly from ${tpl.anchorDate || '?'}`;
+                    else if (tpl.frequency === 'weekly') freqText = `Weekly: ${tpl.weeklyDays.map(d => daysOfWeek.find(x => x.id === d).label).join(', ')}`;
+                    else freqText = `Custom: ${tpl.customDates.join(', ')}`;
 
                     const div = document.createElement('div');
                     div.className = 'bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group';
@@ -957,6 +986,8 @@
         }
 
         window.deleteTransaction = async function(txnId) {
+            const txn = state.transactions.find(t => t.id === txnId);
+            if (txn && txn.date.substring(0, 7) < CURRENT_MONTH_KEY) { alert('Past month entries cannot be deleted.'); return; }
             if (!confirm('Delete this ledger entry?')) return;
             await deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId));
         }
@@ -965,8 +996,8 @@
             if (!confirm('Delete this recurring item? This will also remove all uncleared entries it generated.')) return;
             // Delete the template (fire-and-forget)
             deleteDoc(doc(db, 'users', currentUser.uid, 'templates', tplId));
-            // Clean up all unprocessed transactions from this template (fire-and-forget)
-            state.transactions.filter(t => t.templateId === tplId && t.status === 'unprocessed').forEach(t => {
+            // Clean up unprocessed transactions from this template in current/future months only (fire-and-forget)
+            state.transactions.filter(t => t.templateId === tplId && t.status === 'unprocessed' && t.date.substring(0, 7) >= CURRENT_MONTH_KEY).forEach(t => {
                 deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', t.id));
             });
         }
@@ -974,6 +1005,8 @@
         window.refreshLedgerFromTemplates = function() {
             const year = state.currentDate.getFullYear();
             const month = state.currentDate.getMonth();
+            const viewKey = getMonthKey(year, month);
+            if (viewKey < CURRENT_MONTH_KEY) { alert('Past months are locked and cannot be refreshed.'); return; }
 
             state.templates.forEach(tpl => {
                 const dates = getTemplateDatesForMonth(tpl, year, month);
@@ -1019,8 +1052,9 @@
             document.getElementById('tpl-modal-title').innerText = 'Edit Template';
             toggleFrequencyUI();
 
-            // Reset all checkboxes first
+            // Reset all checkboxes and biweekly anchor first
             document.querySelectorAll('.tpl-month-val, .tpl-day-val').forEach(cb => cb.checked = false);
+            document.getElementById('tpl-anchor-date').value = '';
             tempCustomDates = [];
 
             if (tpl.frequency === 'monthly' && tpl.monthlyDays) {
@@ -1028,6 +1062,8 @@
                     const cb = document.querySelector(`.tpl-month-val[value="${day}"]`);
                     if (cb) cb.checked = true;
                 });
+            } else if (tpl.frequency === 'biweekly' && tpl.anchorDate) {
+                document.getElementById('tpl-anchor-date').value = tpl.anchorDate;
             } else if (tpl.frequency === 'weekly' && tpl.weeklyDays) {
                 tpl.weeklyDays.forEach(day => {
                     const cb = document.querySelector(`.tpl-day-val[value="${day}"]`);
@@ -1116,6 +1152,7 @@
         window.editTransaction = function(txnId) {
             const txn = state.transactions.find(t => t.id === txnId);
             if (!txn) return;
+            if (txn.date.substring(0, 7) < CURRENT_MONTH_KEY) { alert('Past month entries cannot be edited.'); return; }
             document.getElementById('txn-id').value = txn.id;
             document.getElementById('txn-date').value = txn.date;
             document.getElementById('txn-name').value = txn.name;
@@ -1134,6 +1171,7 @@
             tempCustomDates = []; renderDraftCustomDates();
             updateCategoryOptions('tpl-category', 'withdrawal');
             document.querySelectorAll('.tpl-month-val, .tpl-day-val').forEach(cb => cb.checked = false);
+            document.getElementById('tpl-anchor-date').value = '';
             toggleFrequencyUI();
             openModal('template');
         }
@@ -1160,6 +1198,7 @@
             const freq = document.getElementById('tpl-frequency').value;
             let tpl = { id, name: document.getElementById('tpl-name').value, amount: parseFloat(document.getElementById('tpl-amount').value), type: document.getElementById('tpl-type').value, category: document.getElementById('tpl-category').value, frequency: freq, autoProcess: document.getElementById('tpl-autoprocess').checked, details: document.getElementById('tpl-details').value };
             if(freq === 'monthly') tpl.monthlyDays = Array.from(document.querySelectorAll('.tpl-month-val:checked')).map(cb => parseInt(cb.value));
+            else if(freq === 'biweekly') tpl.anchorDate = document.getElementById('tpl-anchor-date').value;
             else if(freq === 'weekly') tpl.weeklyDays = Array.from(document.querySelectorAll('.tpl-day-val:checked')).map(cb => parseInt(cb.value));
             else tpl.customDates = [...tempCustomDates];
 
@@ -1167,12 +1206,12 @@
             setDoc(doc(db, 'users', currentUser.uid, 'templates', id), tpl);
 
             if (isEdit) {
-                // Sync unprocessed entries across all initialized months (fire-and-forget)
-                const unprocessed = state.transactions.filter(t => t.templateId === id && t.status === 'unprocessed');
+                // Sync unprocessed entries in current/future months only (fire-and-forget)
+                const unprocessed = state.transactions.filter(t => t.templateId === id && t.status === 'unprocessed' && t.date.substring(0, 7) >= CURRENT_MONTH_KEY);
 
-                // Build set of valid dates for all initialized months
+                // Build set of valid dates for current/future initialized months
                 const validDates = new Set();
-                state.initializedMonths.forEach(mk => {
+                state.initializedMonths.filter(mk => mk >= CURRENT_MONTH_KEY).forEach(mk => {
                     const [y, m] = mk.split('-').map(Number);
                     getTemplateDatesForMonth(tpl, y, m - 1).forEach(d => validDates.add(d));
                 });
@@ -1191,8 +1230,8 @@
                     }
                 });
 
-                // Create entries for new dates not yet covered
-                const existingDates = new Set(state.transactions.filter(t => t.templateId === id).map(t => t.date));
+                // Create entries for new dates not yet covered (current/future months only)
+                const existingDates = new Set(state.transactions.filter(t => t.templateId === id && t.date.substring(0, 7) >= CURRENT_MONTH_KEY).map(t => t.date));
                 validDates.forEach(dateStr => {
                     if (!existingDates.has(dateStr)) {
                         const txnId = `tplgen_${id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
