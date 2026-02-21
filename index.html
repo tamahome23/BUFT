@@ -687,6 +687,29 @@
         // --- ASYNC CLOUD LOGIC: Auto-injector ---
         function getMonthKey(year, monthIndex) { return `${year}-${(monthIndex + 1).toString().padStart(2, '0')}`; }
 
+        function getTemplateDatesForMonth(tpl, year, monthIndex) {
+            const monthStr = (monthIndex + 1).toString().padStart(2, '0');
+            let dates = [];
+            if (tpl.frequency === 'monthly' && Array.isArray(tpl.monthlyDays)) {
+                tpl.monthlyDays.forEach(day => {
+                    const d = Math.min(day, new Date(year, monthIndex + 1, 0).getDate());
+                    dates.push(`${year}-${monthStr}-${d.toString().padStart(2, '0')}`);
+                });
+            } else if (tpl.frequency === 'weekly' && Array.isArray(tpl.weeklyDays)) {
+                let date = new Date(year, monthIndex, 1);
+                while (date.getMonth() === monthIndex) {
+                    if (tpl.weeklyDays.includes(date.getDay())) dates.push(`${year}-${monthStr}-${date.getDate().toString().padStart(2, '0')}`);
+                    date.setDate(date.getDate() + 1);
+                }
+            } else if (tpl.frequency === 'custom' && Array.isArray(tpl.customDates)) {
+                tpl.customDates.forEach(cd => {
+                    const [m, d] = cd.split('/');
+                    if (parseInt(m) === monthIndex + 1) dates.push(`${year}-${monthStr}-${d.padStart(2, '0')}`);
+                });
+            }
+            return dates;
+        }
+
         async function initializeMonth(year, monthIndex) {
             const monthKey = getMonthKey(year, monthIndex);
             if (state.initializedMonths.includes(monthKey)) return;
@@ -696,34 +719,35 @@
             batch.set(doc(db, 'users', currentUser.uid, 'settings', 'main'), { initializedMonths: state.initializedMonths }, { merge: true });
 
             state.templates.forEach(tpl => {
-                const monthStr = (monthIndex + 1).toString().padStart(2, '0');
-                let datesToInject = [];
-
-                if (tpl.frequency === 'monthly' && Array.isArray(tpl.monthlyDays)) {
-                    tpl.monthlyDays.forEach(day => {
-                        const d = Math.min(day, new Date(year, monthIndex + 1, 0).getDate());
-                        datesToInject.push(`${year}-${monthStr}-${d.toString().padStart(2, '0')}`);
-                    });
-                } else if (tpl.frequency === 'weekly' && Array.isArray(tpl.weeklyDays)) {
-                    let date = new Date(year, monthIndex, 1);
-                    while (date.getMonth() === monthIndex) {
-                        if (tpl.weeklyDays.includes(date.getDay())) datesToInject.push(`${year}-${monthStr}-${date.getDate().toString().padStart(2, '0')}`);
-                        date.setDate(date.getDate() + 1);
-                    }
-                } else if (tpl.frequency === 'custom' && Array.isArray(tpl.customDates)) {
-                    tpl.customDates.forEach(cd => {
-                        const [m, d] = cd.split('/');
-                        if (parseInt(m) === monthIndex + 1) datesToInject.push(`${year}-${monthStr}-${d.padStart(2, '0')}`);
-                    });
-                }
-
-                datesToInject.forEach(dateStr => {
+                getTemplateDatesForMonth(tpl, year, monthIndex).forEach(dateStr => {
                     const id = `tplgen_${tpl.id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
                     const txn = { id, templateId: tpl.id, date: dateStr, name: tpl.name, amount: tpl.amount, type: tpl.type, category: tpl.category, status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: '' };
                     batch.set(doc(db, 'users', currentUser.uid, 'transactions', id), txn);
                 });
             });
             await batch.commit();
+        }
+
+        async function injectTemplateIntoInitializedMonths(tpl) {
+            const batch = writeBatch(db);
+            let needsCommit = false;
+            state.initializedMonths.forEach(monthKey => {
+                const [y, m] = monthKey.split('-').map(Number);
+                const year = y;
+                const monthIndex = m - 1;
+                const existingDates = new Set(
+                    state.transactions.filter(t => t.templateId === tpl.id && t.date.startsWith(monthKey)).map(t => t.date)
+                );
+                getTemplateDatesForMonth(tpl, year, monthIndex).forEach(dateStr => {
+                    if (!existingDates.has(dateStr)) {
+                        const id = `tplgen_${tpl.id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
+                        const txn = { id, templateId: tpl.id, date: dateStr, name: tpl.name, amount: tpl.amount, type: tpl.type, category: tpl.category, status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: '' };
+                        batch.set(doc(db, 'users', currentUser.uid, 'transactions', id), txn);
+                        needsCommit = true;
+                    }
+                });
+            });
+            if (needsCommit) await batch.commit();
         }
 
         async function processAutoClear() {
@@ -1093,6 +1117,7 @@
             else tpl.customDates = [...tempCustomDates];
 
             await setDoc(doc(db, 'users', currentUser.uid, 'templates', id), tpl);
+            await injectTemplateIntoInitializedMonths(tpl);
             closeModal('template');
         }
 
