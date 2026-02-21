@@ -288,6 +288,7 @@
                 <button onclick="closeModal('transaction')" class="text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-100 rounded-full p-1.5 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
             </div>
             <form id="form-transaction" onsubmit="handleTransactionSubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="txn-id">
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Date</label>
@@ -816,9 +817,10 @@
                         <span>$${runningTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
                     </td>
                     <td class="py-4 px-4 text-center">
-                        <div class="flex items-center justify-center space-x-1 opacity-0 group-hover:opacity-100 transition-all">
-                            <button onclick="openCommentModal('${txn.id}')" class="${commentBtnColor} bg-white hover:bg-brand-50 rounded-full p-2 shadow-sm transition-colors" title="Add/Edit Note"><i class="${txn.comment ? 'ph-fill' : 'ph-bold'} ph-chat-text text-lg"></i></button>
-                            <button onclick="deleteTransaction('${txn.id}')" class="text-slate-300 hover:text-rose-500 bg-white hover:bg-rose-50 rounded-full p-2 shadow-sm transition-colors"><i class="ph-bold ph-trash text-lg"></i></button>
+                        <div class="flex items-center justify-center space-x-1">
+                            <button onclick="openCommentModal('${txn.id}')" class="${commentBtnColor} bg-white hover:bg-brand-50 rounded-full p-1.5 shadow-sm transition-colors" title="Add/Edit Note"><i class="${txn.comment ? 'ph-fill' : 'ph-bold'} ph-chat-text"></i></button>
+                            <button onclick="editTransaction('${txn.id}')" class="text-slate-300 hover:text-brand-500 bg-white hover:bg-brand-50 rounded-full p-1.5 shadow-sm transition-colors" title="Edit Entry"><i class="ph-bold ph-pencil-simple"></i></button>
+                            <button onclick="deleteTransaction('${txn.id}')" class="text-slate-300 hover:text-rose-500 bg-white hover:bg-rose-50 rounded-full p-1.5 shadow-sm transition-colors" title="Delete Entry"><i class="ph-bold ph-trash"></i></button>
                         </div>
                     </td>
                 `;
@@ -956,9 +958,14 @@
             await deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId));
         }
 
-        window.deleteTemplate = async function(tplId) {
-            if (!confirm('Delete this recurring rule? Future months will no longer generate entries from it.')) return;
-            await deleteDoc(doc(db, 'users', currentUser.uid, 'templates', tplId));
+        window.deleteTemplate = function(tplId) {
+            if (!confirm('Delete this recurring rule? This will also remove all uncleared entries it generated.')) return;
+            // Delete the template (fire-and-forget)
+            deleteDoc(doc(db, 'users', currentUser.uid, 'templates', tplId));
+            // Clean up all unprocessed transactions from this template (fire-and-forget)
+            state.transactions.filter(t => t.templateId === tplId && t.status === 'unprocessed').forEach(t => {
+                deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', t.id));
+            });
         }
 
         window.editTemplate = function(tplId) {
@@ -1063,15 +1070,31 @@
 
         window.openTransactionModal = function() {
             document.getElementById('form-transaction').reset();
+            document.getElementById('txn-id').value = '';
             const year = state.currentDate.getFullYear(); const month = (state.currentDate.getMonth() + 1).toString().padStart(2, '0');
             document.getElementById('txn-date').value = `${year}-${month}-01`;
             updateCategoryOptions('txn-category', 'withdrawal');
             openModal('transaction');
         }
 
+        window.editTransaction = function(txnId) {
+            const txn = state.transactions.find(t => t.id === txnId);
+            if (!txn) return;
+            document.getElementById('txn-id').value = txn.id;
+            document.getElementById('txn-date').value = txn.date;
+            document.getElementById('txn-name').value = txn.name;
+            document.getElementById('txn-amount').value = txn.amount;
+            document.getElementById('txn-type').value = txn.type;
+            updateCategoryOptions('txn-category', txn.type);
+            document.getElementById('txn-category').value = txn.category;
+            document.getElementById('txn-comment').value = txn.comment || '';
+            openModal('transaction');
+        }
+
         window.openTemplateModal = function() {
             document.getElementById('form-template').reset();
             document.getElementById('tpl-id').value = '';
+            document.getElementById('tpl-modal-title').innerText = 'New Template';
             tempCustomDates = []; renderDraftCustomDates();
             updateCategoryOptions('tpl-category', 'withdrawal');
             document.querySelectorAll('.tpl-month-val, .tpl-day-val').forEach(cb => cb.checked = false);
@@ -1081,13 +1104,22 @@
 
         window.handleTransactionSubmit = function(e) {
             e.preventDefault();
-            const id = 't_' + Date.now();
-            setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), { id, date: document.getElementById('txn-date').value, name: document.getElementById('txn-name').value, amount: parseFloat(document.getElementById('txn-amount').value), type: document.getElementById('txn-type').value, category: document.getElementById('txn-category').value, status: 'unprocessed', comment: document.getElementById('txn-comment').value });
+            const existingId = document.getElementById('txn-id').value;
+            const id = existingId || 't_' + Date.now();
+            const txnData = { id, date: document.getElementById('txn-date').value, name: document.getElementById('txn-name').value, amount: parseFloat(document.getElementById('txn-amount').value), type: document.getElementById('txn-type').value, category: document.getElementById('txn-category').value, comment: document.getElementById('txn-comment').value };
+            if (existingId) {
+                // Editing: merge to preserve templateId, autoProcess, status
+                setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), txnData, { merge: true });
+            } else {
+                txnData.status = 'unprocessed';
+                setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), txnData);
+            }
             closeModal('transaction');
         }
 
         window.handleTemplateSubmit = function(e) {
             e.preventDefault();
+            const isEdit = !!document.getElementById('tpl-id').value;
             const id = document.getElementById('tpl-id').value || 'tpl_' + Date.now();
             const freq = document.getElementById('tpl-frequency').value;
             let tpl = { id, name: document.getElementById('tpl-name').value, amount: parseFloat(document.getElementById('tpl-amount').value), type: document.getElementById('tpl-type').value, category: document.getElementById('tpl-category').value, frequency: freq, autoProcess: document.getElementById('tpl-autoprocess').checked, details: document.getElementById('tpl-details').value };
@@ -1095,22 +1127,61 @@
             else if(freq === 'weekly') tpl.weeklyDays = Array.from(document.querySelectorAll('.tpl-day-val:checked')).map(cb => parseInt(cb.value));
             else tpl.customDates = [...tempCustomDates];
 
-            // Save template (fire-and-forget — same pattern as handleTransactionSubmit)
+            // Save template (fire-and-forget)
             setDoc(doc(db, 'users', currentUser.uid, 'templates', id), tpl);
 
-            // Create ledger entries for current month (fire-and-forget)
-            const year = state.currentDate.getFullYear();
-            const month = state.currentDate.getMonth();
-            getTemplateDatesForMonth(tpl, year, month).forEach(dateStr => {
-                if (!state.transactions.some(t => t.templateId === id && t.date === dateStr)) {
-                    const txnId = `tplgen_${id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
-                    setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), {
-                        id: txnId, templateId: id, date: dateStr, name: tpl.name,
-                        amount: tpl.amount, type: tpl.type, category: tpl.category,
-                        status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: ''
-                    });
-                }
-            });
+            if (isEdit) {
+                // Sync unprocessed entries across all initialized months (fire-and-forget)
+                const unprocessed = state.transactions.filter(t => t.templateId === id && t.status === 'unprocessed');
+
+                // Build set of valid dates for all initialized months
+                const validDates = new Set();
+                state.initializedMonths.forEach(mk => {
+                    const [y, m] = mk.split('-').map(Number);
+                    getTemplateDatesForMonth(tpl, y, m - 1).forEach(d => validDates.add(d));
+                });
+
+                // Update entries that still match a valid date, delete ones that don't
+                unprocessed.forEach(t => {
+                    if (validDates.has(t.date)) {
+                        // Update with new template values, preserve comment
+                        setDoc(doc(db, 'users', currentUser.uid, 'transactions', t.id), {
+                            name: tpl.name, amount: tpl.amount, type: tpl.type,
+                            category: tpl.category, autoProcess: tpl.autoProcess || false
+                        }, { merge: true });
+                    } else {
+                        // Date no longer in schedule — remove
+                        deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', t.id));
+                    }
+                });
+
+                // Create entries for new dates not yet covered
+                const existingDates = new Set(state.transactions.filter(t => t.templateId === id).map(t => t.date));
+                validDates.forEach(dateStr => {
+                    if (!existingDates.has(dateStr)) {
+                        const txnId = `tplgen_${id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
+                        setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), {
+                            id: txnId, templateId: id, date: dateStr, name: tpl.name,
+                            amount: tpl.amount, type: tpl.type, category: tpl.category,
+                            status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: ''
+                        });
+                    }
+                });
+            } else {
+                // New template — create ledger entries for current month (fire-and-forget)
+                const year = state.currentDate.getFullYear();
+                const month = state.currentDate.getMonth();
+                getTemplateDatesForMonth(tpl, year, month).forEach(dateStr => {
+                    if (!state.transactions.some(t => t.templateId === id && t.date === dateStr)) {
+                        const txnId = `tplgen_${id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
+                        setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), {
+                            id: txnId, templateId: id, date: dateStr, name: tpl.name,
+                            amount: tpl.amount, type: tpl.type, category: tpl.category,
+                            status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: ''
+                        });
+                    }
+                });
+            }
 
             closeModal('template');
         }
