@@ -80,7 +80,7 @@
     <div id="main-app" class="flex w-full h-full opacity-0 transition-opacity duration-500 hide">
         
         <!-- ACCESS VERIFICATION GATE (Bouncer) -->
-        <div id="access-gate-overlay" class="absolute inset-0 bg-slate-900/80 backdrop-blur-md z-[150] flex flex-col items-center justify-center hidden opacity-0 transition-all duration-300">
+        <div id="access-gate-overlay" class="absolute inset-0 bg-slate-900/80 backdrop-blur-md z-[150] flex flex-col items-center justify-center hide opacity-0 transition-all duration-300">
             <div class="bg-white p-8 rounded-3xl shadow-2xl flex flex-col max-w-lg w-[90%] relative overflow-hidden border-t-8 border-brand-500">
                 <div class="flex items-center mb-6">
                     <div class="bg-brand-100 p-3 rounded-full mr-4">
@@ -557,7 +557,7 @@
                 if (!state.hasAcceptedTerms) {
                     document.getElementById('data-loader').classList.add('hide');
                     const gate = document.getElementById('access-gate-overlay');
-                    gate.classList.remove('hidden');
+                    gate.classList.remove('hide');
                     setTimeout(() => gate.classList.remove('opacity-0'), 10);
                     return;
                 }
@@ -566,7 +566,7 @@
                 document.getElementById('data-loader').classList.add('hide');
                 const gate = document.getElementById('access-gate-overlay');
                 gate.classList.add('opacity-0');
-                setTimeout(() => { gate.classList.add('hidden'); gate.classList.remove('flex'); }, 300);
+                setTimeout(() => { gate.classList.add('hide'); }, 300);
                 try {
                     await initializeMonth(state.currentDate.getFullYear(), state.currentDate.getMonth());
                     await processAutoClear();
@@ -588,7 +588,7 @@
                 hasInitializedCore = true;
                 const gate = document.getElementById('access-gate-overlay');
                 gate.classList.add('opacity-0');
-                setTimeout(() => { gate.classList.add('hidden'); }, 300);
+                setTimeout(() => { gate.classList.add('hide'); }, 300);
                 document.getElementById('data-loader').classList.add('hide');
                 try {
                     await initializeMonth(state.currentDate.getFullYear(), state.currentDate.getMonth());
