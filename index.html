@@ -438,7 +438,8 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         
-        // --- THE SAFARI STABILITY FIX ---
+        // --- CRITICAL SAFARI IPAD FIX ---
+        // Forces the database to use standard web pipes instead of WebSockets which Safari often blocks.
         const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 
         let currentUser = null;
@@ -492,7 +493,9 @@
             const uid = currentUser.uid;
             const settingsRef = doc(db, 'users', uid, 'settings', 'main');
             
-            // --- SELF-HEALING: Ensure profile exists immediately ---
+            // --- SELF-HEALING LOGIC ---
+            // If the user logs in but doesn't have a settings file yet, we create one instantly.
+            // This prevents the "Loading..." hang caused by waiting for a snapshot of a non-existent file.
             const snap = await getDoc(settingsRef);
             if (!snap.exists()) {
                 await setDoc(settingsRef, { bankBalance: 0, initializedMonths: [], hasAcceptedTerms: false });
@@ -506,7 +509,7 @@
                 }
                 dataLoaded.settings = true;
                 checkReadyToInit();
-            });
+            }, (err) => console.error("Settings Sync Error:", err));
 
             onSnapshot(collection(db, 'users', uid, 'templates'), (snapshot) => {
                 let tpls = [];
@@ -514,7 +517,7 @@
                 state.templates = tpls;
                 dataLoaded.tpls = true;
                 checkReadyToInit();
-            });
+            }, (err) => console.error("Templates Sync Error:", err));
 
             onSnapshot(collection(db, 'users', uid, 'transactions'), (snapshot) => {
                 let txns = [];
@@ -522,18 +525,19 @@
                 state.transactions = txns;
                 dataLoaded.txns = true;
                 checkReadyToInit();
-            });
+            }, (err) => console.error("Txns Sync Error:", err));
         }
 
         async function checkReadyToInit() {
             if (dataLoaded.settings && dataLoaded.txns && dataLoaded.tpls) {
                 if (!hasInitializedCore) {
+                    // THE BOUNCER CHECK: If user hasn't typed L337 yet, show the shield.
                     if (!state.hasAcceptedTerms) {
                         document.getElementById('data-loader').classList.add('hidden');
                         const gate = document.getElementById('access-gate-overlay');
                         gate.classList.remove('hidden');
                         setTimeout(() => gate.classList.remove('opacity-0'), 10);
-                        return;
+                        return; // Stop app initialization until code is verified
                     }
                     hasInitializedCore = true;
                     document.getElementById('data-loader').classList.add('hidden');
@@ -550,12 +554,16 @@
 
         window.verifyAccessCode = async (e) => {
             e.preventDefault();
-            if (document.getElementById('access-code-input').value.trim().toUpperCase() === 'L337') {
+            const code = document.getElementById('access-code-input').value.trim().toUpperCase();
+            if (code === 'L337') {
                 await setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { hasAcceptedTerms: true }, { merge: true });
                 state.hasAcceptedTerms = true;
-                hasInitializedCore = false; // Trigger reload
+                // Once verified, we resume the init process
+                hasInitializedCore = false; 
                 checkReadyToInit();
-            } else alert("Invalid Code");
+            } else {
+                document.getElementById('access-error').classList.remove('hidden');
+            }
         }
 
         // --- UI DATA ---
