@@ -94,7 +94,7 @@
                 
                 <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 text-sm text-slate-600 leading-relaxed">
                     <p class="mb-3">This is a private, self-hosted instance of BUFT. Access requires acknowledge of data storage on the owner's private cloud.</p>
-                    <p>Contact the owner for the access code at <a href="mailto:bakaneko@bakeaneko.net" class="font-bold text-brand-600 hover:underline">bakaneko@bakeaneko.net</a>.</p>
+                    <p>Contact the owner for the code at <a href="mailto:bakaneko@bakeaneko.net" class="font-bold text-brand-600 hover:underline">bakaneko@bakeaneko.net</a>.</p>
                 </div>
 
                 <form onsubmit="verifyAccessCode(event)" class="space-y-4">
@@ -111,7 +111,6 @@
             </div>
         </div>
 
-        <!-- Sidebar -->
         <aside class="w-20 lg:w-64 bg-white border-r border-slate-200 flex flex-col hidden md:flex shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10">
             <div class="h-28 flex flex-col items-center justify-center border-b border-slate-100 px-4">
                 <div class="group relative flex flex-col items-center cursor-help">
@@ -328,7 +327,7 @@
         </div>
     </div>
 
-    <!-- Comment Edit Modal -->
+    <!-- Restored Comment Edit Modal -->
     <div id="modal-comment" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[110] px-4 opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform scale-95 transition-transform duration-300">
             <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-brand-50">
@@ -346,7 +345,7 @@
         </div>
     </div>
 
-    <!-- Rule Template Modal -->
+    <!-- Restored Full Fidelity Template Modal -->
     <div id="modal-template" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[100] px-4 opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300 max-h-[90vh] flex flex-col">
             <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
@@ -430,7 +429,7 @@
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { initializeFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Config - Provided by User
+        // Firebase Config
         const firebaseConfig = {
             apiKey: "AIzaSyCkZHoWGByIZXzFSGjrZMHgEytwdqyZLqE",
             authDomain: "buft-b0d7f.firebaseapp.com",
@@ -444,8 +443,8 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         
-        // --- CRITICAL IPAD FIX: Long Polling ---
-        // Forced connection method for Safari compatibility on iPadOS.
+        // --- CRITICAL IPAD STABILITY FIX: Forced Long Polling ---
+        // This stops the WebSocket connection from hanging on Safari and Edge for iPad.
         const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 
         let currentUser = null;
@@ -499,12 +498,11 @@
             const uid = currentUser.uid;
             const settingsRef = doc(db, 'users', uid, 'settings', 'main');
             
-            // --- SELF-HEALING KICKSTART ---
-            // We check for the document existence immediately. 
-            // If it's not there, we create it to force the "hasAcceptedTerms" check to start.
+            // --- SELF-HEALING: Check for existence immediately to prevent the "Syncing" loop ---
             try {
                 const snap = await getDoc(settingsRef);
                 if (!snap.exists()) {
+                    // Start fresh if user doc doesn't exist (e.g. after a purge)
                     await setDoc(settingsRef, { bankBalance: 0, initializedMonths: [], hasAcceptedTerms: false });
                 }
 
@@ -516,7 +514,7 @@
                     }
                     dataLoaded.settings = true;
                     checkReadyToInit();
-                }, (err) => console.error("Snapshot Settings Error:", err));
+                }, (err) => console.error("Database connection error:", err));
 
                 onSnapshot(collection(db, 'users', uid, 'templates'), (snapshot) => {
                     let tpls = [];
@@ -524,7 +522,7 @@
                     state.templates = tpls;
                     dataLoaded.tpls = true;
                     checkReadyToInit();
-                }, (err) => console.error("Snapshot Templates Error:", err));
+                });
 
                 onSnapshot(collection(db, 'users', uid, 'transactions'), (snapshot) => {
                     let txns = [];
@@ -532,22 +530,22 @@
                     state.transactions = txns;
                     dataLoaded.txns = true;
                     checkReadyToInit();
-                }, (err) => console.error("Snapshot Transactions Error:", err));
-            } catch (error) {
-                console.error("Cloud Sync Setup Failure:", error);
+                });
+            } catch (err) {
+                console.error("Initial Cloud Connection Failure:", err);
             }
         }
 
         async function checkReadyToInit() {
             if (dataLoaded.settings && dataLoaded.txns && dataLoaded.tpls) {
                 if (!hasInitializedCore) {
-                    // THE BOUNCER CHECK (Accept terms code)
+                    // THE BOUNCER CHECK
                     if (!state.hasAcceptedTerms) {
                         document.getElementById('data-loader').classList.add('hidden');
                         const gate = document.getElementById('access-gate-overlay');
                         gate.classList.remove('hidden');
                         setTimeout(() => gate.classList.remove('opacity-0'), 10);
-                        return; // Halt app loading until code verified
+                        return; 
                     }
                     hasInitializedCore = true;
                     document.getElementById('data-loader').classList.add('hidden');
@@ -568,7 +566,7 @@
             if (code === 'L337') {
                 await setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { hasAcceptedTerms: true }, { merge: true });
                 state.hasAcceptedTerms = true;
-                // Re-init core to proceed past the gate
+                // Reload Core to proceed
                 hasInitializedCore = false;
                 checkReadyToInit();
             } else {
@@ -576,7 +574,7 @@
             }
         }
 
-        // --- UI DATA & CONFIGS ---
+        // --- RESTORED FEATURE: Category Configs ---
         window.categoryConfig = {
             withdrawal: [
                 { name: 'Home', color: 'bg-indigo-100 text-indigo-700' },
@@ -664,7 +662,7 @@
             setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { bankBalance: num }, { merge: true });
         }
 
-        // --- CORE ASYNC LOGIC: Month Prep ---
+        // --- ASYNC CLOUD LOGIC: Auto-injector ---
         function getMonthKey(year, monthIndex) { return `${year}-${(monthIndex + 1).toString().padStart(2, '0')}`; }
 
         async function initializeMonth(year, monthIndex) {
@@ -720,12 +718,7 @@
             if(needsCommit) await batch.commit();
         }
 
-        // --- LEDGER RENDERING ENGINE ---
-        function getMonthlyTransactions() {
-            const monthKey = getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
-            return state.transactions.filter(t => t.date.startsWith(monthKey)).sort((a, b) => new Date(a.date) - new Date(b.date));
-        }
-
+        // --- LEDGER ---
         function renderLedger() {
             const tbody = document.getElementById('ledger-body');
             tbody.innerHTML = '';
@@ -734,14 +727,11 @@
             let runningTotal = 0; let remainingImpact = 0;
             const todayStr = REAL_CURRENT_DATE.toISOString().split('T')[0];
 
-            if(txns.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400 font-medium italic">No ledger entries for this month. Rules will automatically populate upon selection.</td></tr>`;
-            }
+            if(txns.length === 0) tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400 font-medium italic">No entries for this month. Templates will populate on first view.</td></tr>`;
 
             let dividerDrawn = false;
 
             txns.forEach((txn) => {
-                // Draw 'Today & Future' divider line
                 if (!dividerDrawn && txn.date >= todayStr) {
                     const hasPastItems = txns.some(t => t.date < todayStr);
                     if (hasPastItems || txn.date === todayStr) {
@@ -754,14 +744,8 @@
                     dividerDrawn = true;
                 }
 
-                // Math for summary cards
-                if (txn.type === 'deposit') { 
-                    runningTotal += txn.amount; 
-                    if (txn.status !== 'cleared') remainingImpact += txn.amount; 
-                } else { 
-                    runningTotal -= txn.amount; 
-                    if (txn.status !== 'cleared') remainingImpact -= txn.amount; 
-                }
+                if (txn.type === 'deposit') { runningTotal += txn.amount; if (txn.status !== 'cleared') remainingImpact += txn.amount; } 
+                else { runningTotal -= txn.amount; if (txn.status !== 'cleared') remainingImpact -= txn.amount; }
 
                 const isCleared = txn.status === 'cleared';
                 const isPast = txn.date < todayStr;
@@ -823,32 +807,7 @@
             projEl.className = projectedEom < 0 ? "text-3xl font-extrabold mt-1 tracking-tight z-10 text-rose-400" : "text-3xl font-extrabold mt-1 tracking-tight z-10 text-emerald-400";
         }
 
-        window.updateStatus = function(id, newStatus) { 
-            setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), { status: newStatus }, { merge: true }); 
-        }
-
-        window.deleteTransaction = function(id) { 
-            if(confirm("Remove this entry completely?")) { 
-                deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', id)); 
-            } 
-        }
-        
-        window.openCommentModal = function(id) {
-            const txn = state.transactions.find(t => t.id === id);
-            if(!txn) return;
-            document.getElementById('edit-comment-id').value = id;
-            document.getElementById('edit-comment-text').value = txn.comment || '';
-            openModal('comment');
-        }
-
-        window.saveLedgerComment = function() {
-            const id = document.getElementById('edit-comment-id').value;
-            const text = document.getElementById('edit-comment-text').value;
-            setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), { comment: text }, { merge: true });
-            closeModal('comment');
-        }
-
-        // --- RULE TEMPLATE MANAGEMENT ---
+        // --- RESTORED FEATURE: Template Grid Mechanics ---
         function setupWeeklyCheckboxes() {
             document.getElementById('tpl-weekly-days').innerHTML = daysOfWeek.map(d => `
                 <label class="day-checkbox cursor-pointer relative"><input type="checkbox" value="${d.id}" class="peer sr-only tpl-day-val"><div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 border-slate-200 bg-white text-slate-500 font-bold transition-all peer-hover:border-brand-300">${d.label}</div></label>
@@ -874,18 +833,8 @@
             const d = document.getElementById('tpl-custom-dd').value.padStart(2, '0');
             if(m > 0 && m <= 12 && d > 0 && d <= 31) {
                 const val = `${m}/${d}`;
-                if(!tempCustomDates.includes(val)) { 
-                    tempCustomDates.push(val); 
-                    renderDraftCustomDates(); 
-                }
-                document.getElementById('tpl-custom-mm').value = ''; 
-                document.getElementById('tpl-custom-dd').value = '';
+                if(!tempCustomDates.includes(val)) { tempCustomDates.push(val); renderDraftCustomDates(); }
             }
-        }
-
-        window.removeCustomDate = function(val) { 
-            tempCustomDates = tempCustomDates.filter(d => d !== val); 
-            renderDraftCustomDates(); 
         }
 
         function renderDraftCustomDates() {
@@ -894,18 +843,12 @@
             `).join('');
         }
 
-        window.setTemplateView = function(mode) {
-            state.templateViewMode = mode;
-            document.getElementById('btn-view-cat').className = mode === 'category' ? "px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-brand-600 shadow-sm transition-all" : "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all";
-            document.getElementById('btn-view-rec').className = mode === 'recurrence' ? "px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-brand-600 shadow-sm transition-all" : "px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all";
-            renderTemplates();
-        }
+        window.removeCustomDate = function(val) { tempCustomDates = tempCustomDates.filter(d => d !== val); renderDraftCustomDates(); }
 
         function renderTemplates() {
             const container = document.getElementById('templates-container');
             container.innerHTML = '';
             let groups = {};
-            
             state.templates.forEach(tpl => {
                 const groupKey = state.templateViewMode === 'category' ? tpl.category : (tpl.frequency.charAt(0).toUpperCase() + tpl.frequency.slice(1));
                 if(!groups[groupKey]) groups[groupKey] = [];
@@ -914,24 +857,13 @@
 
             Object.keys(groups).sort().forEach(groupName => {
                 const section = document.createElement('div');
-                section.innerHTML = `
-                    <h3 class="font-extrabold text-slate-400 uppercase tracking-wider text-[10px] mb-4 border-b border-slate-200 pb-2">${groupName}</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8" id="group-${groupName.replace(/\s+/g, '')}"></div>
-                `;
+                section.innerHTML = `<h3 class="font-extrabold text-slate-400 uppercase tracking-wider text-[10px] mb-4 border-b border-slate-200 pb-2">${groupName}</h3><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8" id="group-${groupName.replace(/\s+/g, '')}"></div>`;
                 container.appendChild(section);
                 const grid = section.querySelector('div');
-
                 groups[groupName].forEach(tpl => {
                     const isExpense = tpl.type === 'withdrawal';
                     const catColor = getCatColorClass(tpl.type, tpl.category);
-                    let freqText = "";
-                    
-                    if(tpl.frequency === 'monthly') freqText = `<i class="ph-fill ph-calendar-blank mr-1.5 text-slate-400"></i> Dates: ${tpl.monthlyDays.join(', ')}`;
-                    else if (tpl.frequency === 'weekly') freqText = `<i class="ph-fill ph-arrows-clockwise mr-1.5 text-slate-400"></i> Weekly on ${tpl.weeklyDays.map(dId => daysOfWeek.find(d => d.id === dId).label).join(', ')}`;
-                    else freqText = `<i class="ph-fill ph-calendar-star mr-1.5 text-slate-400"></i> Dates: ${tpl.customDates.join(', ')}`;
-
-                    const autoBadge = tpl.autoProcess ? `<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold ml-2 uppercase tracking-wider flex items-center"><i class="ph-fill ph-lightning mr-1"></i> Auto</span>` : '';
-                    const detailsBox = tpl.details ? `<div class="mt-4 pt-4 border-t border-slate-100"><p class="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed"><i class="ph-fill ph-info text-brand-400 mr-1.5"></i>${tpl.details}</p></div>` : '';
+                    let freqText = tpl.frequency === 'monthly' ? `Dates: ${tpl.monthlyDays.join(', ')}` : (tpl.frequency === 'weekly' ? `Weekly: ${tpl.weeklyDays.map(d => daysOfWeek.find(x => x.id === d).label).join(', ')}` : `Custom: ${tpl.customDates.join(', ')}`);
 
                     const div = document.createElement('div');
                     div.className = 'bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group';
@@ -945,166 +877,19 @@
                                     <button onclick="deleteTemplate('${tpl.id}')" class="text-slate-400 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 rounded-full p-2 transition-colors"><i class="ph-bold ph-trash"></i></button>
                                 </div>
                             </div>
-                            <h3 class="font-bold text-lg text-slate-800 leading-tight mb-1 flex items-center flex-wrap">${tpl.name} ${autoBadge}</h3>
+                            <h3 class="font-bold text-lg text-slate-800 leading-tight mb-1">${tpl.name} ${tpl.autoProcess ? '⚡' : ''}</h3>
                             <div class="text-3xl font-extrabold ${isExpense ? 'text-slate-900' : 'text-emerald-600'} mb-3 tracking-tight">${isExpense ? '' : '+'}$${tpl.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
                             <p class="text-xs font-bold text-slate-500 flex items-center bg-slate-50 py-2 px-3 rounded-xl w-fit border border-slate-100">${freqText}</p>
-                            ${detailsBox}
+                            <p class="text-[10px] text-slate-400 mt-4 leading-relaxed">${tpl.details || ''}</p>
                         </div>
                     `;
                     grid.appendChild(div);
                 });
             });
-            if(Object.keys(groups).length === 0) container.innerHTML = '<p class="text-slate-400 italic font-medium py-8">No rules created yet. Create a rule to auto-populate your monthly ledger.</p>';
+            if(Object.keys(groups).length === 0) container.innerHTML = '<p class="text-slate-400 italic font-medium py-8">No rules created yet.</p>';
         }
 
-        async function cleanFutureUnprocessedTransactions(templateId) {
-            const firstOfCurrentMonthStr = `${REAL_CURRENT_DATE.getFullYear()}-${(REAL_CURRENT_DATE.getMonth()+1).toString().padStart(2,'0')}-01`;
-            const batch = writeBatch(db);
-            state.transactions.forEach(t => {
-                if(t.templateId === templateId && t.status === 'unprocessed' && t.date >= firstOfCurrentMonthStr) {
-                    batch.delete(doc(db, 'users', currentUser.uid, 'transactions', t.id));
-                }
-            });
-            await batch.commit();
-        }
-
-        window.deleteTemplate = async function(id) {
-            if(confirm("Delete rule? This will remove future uncleared items based on this rule. Past entries remain locked.")) {
-                await deleteDoc(doc(db, 'users', currentUser.uid, 'templates', id));
-                await cleanFutureUnprocessedTransactions(id);
-            }
-        }
-
-        window.editTemplate = function(id) {
-            const tpl = state.templates.find(t => t.id === id);
-            if(!tpl) return;
-            document.getElementById('form-template').reset();
-            document.getElementById('tpl-id').value = tpl.id;
-            document.getElementById('tpl-modal-title').innerText = "Edit Recurring Rule";
-            document.getElementById('tpl-save-btn').innerText = "Update Rule";
-            document.getElementById('tpl-name').value = tpl.name;
-            document.getElementById('tpl-type').value = tpl.type;
-            updateCategoryOptions('tpl-category', tpl.type);
-            document.getElementById('tpl-category').value = tpl.category;
-            document.getElementById('tpl-amount').value = tpl.amount;
-            document.getElementById('tpl-details').value = tpl.details || '';
-            document.getElementById('tpl-autoprocess').checked = tpl.autoProcess;
-            document.getElementById('tpl-frequency').value = tpl.frequency;
-            
-            toggleFrequencyUI();
-            document.querySelectorAll('.tpl-month-val, .tpl-day-val').forEach(cb => cb.checked = false);
-            tempCustomDates = []; renderDraftCustomDates();
-
-            if(tpl.frequency === 'monthly') {
-                tpl.monthlyDays.forEach(d => { 
-                    const cb = document.querySelector(`.tpl-month-val[value="${d}"]`); 
-                    if(cb) cb.checked = true; 
-                });
-            } else if (tpl.frequency === 'weekly') {
-                tpl.weeklyDays.forEach(d => { 
-                    const cb = document.querySelector(`.tpl-day-val[value="${d}"]`); 
-                    if(cb) cb.checked = true; 
-                });
-            } else { 
-                tempCustomDates = [...tpl.customDates]; 
-                renderDraftCustomDates(); 
-            }
-
-            openModal('template');
-        }
-
-        window.handleTransactionSubmit = function(e) {
-            e.preventDefault();
-            const txn = {
-                id: 't_' + Date.now(),
-                date: document.getElementById('txn-date').value,
-                name: document.getElementById('txn-name').value,
-                amount: parseFloat(document.getElementById('txn-amount').value),
-                type: document.getElementById('txn-type').value,
-                category: document.getElementById('txn-category').value,
-                status: 'unprocessed',
-                autoProcess: false,
-                comment: document.getElementById('txn-comment').value
-            };
-            setDoc(doc(db, 'users', currentUser.uid, 'transactions', txn.id), txn);
-            closeModal('transaction');
-        }
-
-        window.handleTemplateSubmit = async function(e) {
-            e.preventDefault();
-            const freq = document.getElementById('tpl-frequency').value;
-            const editId = document.getElementById('tpl-id').value;
-            
-            let tpl = {
-                id: editId ? editId : 'tpl_' + Date.now(),
-                name: document.getElementById('tpl-name').value,
-                amount: parseFloat(document.getElementById('tpl-amount').value),
-                type: document.getElementById('tpl-type').value,
-                category: document.getElementById('tpl-category').value,
-                frequency: freq,
-                autoProcess: document.getElementById('tpl-autoprocess').checked,
-                details: document.getElementById('tpl-details').value
-            };
-
-            if(freq === 'monthly') {
-                const checked = Array.from(document.querySelectorAll('.tpl-month-val:checked')).map(cb => parseInt(cb.value));
-                if(checked.length === 0) { alert("Select at least one date."); return; }
-                tpl.monthlyDays = checked.sort((a,b) => a-b);
-            } else if(freq === 'weekly') {
-                const checked = Array.from(document.querySelectorAll('.tpl-day-val:checked')).map(cb => parseInt(cb.value));
-                if(checked.length === 0) { alert("Select at least one day."); return; }
-                tpl.weeklyDays = checked;
-            } else {
-                if(tempCustomDates.length === 0) { alert("Add at least one specific date."); return; }
-                tpl.customDates = [...tempCustomDates];
-            }
-
-            if(editId) await cleanFutureUnprocessedTransactions(editId);
-            await setDoc(doc(db, 'users', currentUser.uid, 'templates', tpl.id), tpl);
-            closeModal('template');
-            
-            // Re-trigger current month and future months to apply changes
-            const firstOfCurrentMonthStr = `${REAL_CURRENT_DATE.getFullYear()}-${(REAL_CURRENT_DATE.getMonth()+1).toString().padStart(2,'0')}`;
-            state.initializedMonths.forEach(monthKey => {
-                if(monthKey >= firstOfCurrentMonthStr) {
-                    const [y, m] = monthKey.split('-');
-                    injectNewRuleToInitializedMonth(tpl, parseInt(y), parseInt(m)-1);
-                }
-            });
-            await processAutoClear();
-        }
-
-        async function injectNewRuleToInitializedMonth(tpl, year, monthIndex) {
-            const batch = writeBatch(db);
-            const monthStr = (monthIndex + 1).toString().padStart(2, '0');
-            let datesToInject = [];
-
-            if (tpl.frequency === 'monthly') {
-                tpl.monthlyDays.forEach(day => {
-                    const d = Math.min(day, new Date(year, monthIndex + 1, 0).getDate()); 
-                    datesToInject.push(`${year}-${monthStr}-${d.toString().padStart(2, '0')}`);
-                });
-            } else if (tpl.frequency === 'weekly') {
-                let date = new Date(year, monthIndex, 1);
-                while (date.getMonth() === monthIndex) {
-                    if (tpl.weeklyDays.includes(date.getDay())) datesToInject.push(`${year}-${monthStr}-${date.getDate().toString().padStart(2, '0')}`);
-                    date.setDate(date.getDate() + 1);
-                }
-            } else if (tpl.frequency === 'custom') {
-                tpl.customDates.forEach(cd => {
-                    const [m, d] = cd.split('/');
-                    if (parseInt(m) === monthIndex + 1) datesToInject.push(`${year}-${monthStr}-${d.padStart(2, '0')}`);
-                });
-            }
-
-            datesToInject.forEach(dateStr => {
-                const id = `tplgen_${tpl.id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
-                batch.set(doc(db, 'users', currentUser.uid, 'transactions', id), { id, templateId: tpl.id, date: dateStr, name: tpl.name, amount: tpl.amount, type: tpl.type, category: tpl.category, status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: '' });
-            });
-            await batch.commit();
-        }
-
-        // --- DASHBOARD RENDERING ENGINE ---
+        // --- RESTORED FEATURE: Dashboard Logic ---
         function renderDashboard() {
             const txns = getMonthlyTransactions();
             let income = 0; let expense = 0; const expensesByCategory = {};
@@ -1112,13 +897,8 @@
 
             txns.forEach(t => {
                 if(t.type === 'deposit') { income += t.amount; runningTotal += t.amount; } 
-                else { 
-                    expense += t.amount; 
-                    expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount; 
-                    runningTotal -= t.amount; 
-                }
-                trendLabels.push(formatDate(t.date)); 
-                trendData.push(runningTotal);
+                else { expense += t.amount; expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount; runningTotal -= t.amount; }
+                trendLabels.push(formatDate(t.date)); trendData.push(runningTotal);
             });
 
             if(cashflowChartObj) cashflowChartObj.destroy();
@@ -1127,106 +907,30 @@
 
             Chart.defaults.font.family = '"Plus Jakarta Sans", sans-serif';
 
-            // Running Balance Trend (Line)
             const ctxTrend = document.getElementById('balanceTrendChart').getContext('2d');
-            let gradient = ctxTrend.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.2)'); 
-            gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
             balanceTrendChartObj = new Chart(ctxTrend, {
                 type: 'line',
-                data: { 
-                    labels: trendLabels, 
-                    datasets: [{ 
-                        label: 'Running Balance Impact', 
-                        data: trendData, 
-                        borderColor: '#6366f1', 
-                        backgroundColor: gradient, 
-                        borderWidth: 3, 
-                        pointBackgroundColor: '#fff', 
-                        pointBorderColor: '#6366f1', 
-                        pointBorderWidth: 2, 
-                        pointRadius: 4, 
-                        pointHoverRadius: 6, 
-                        fill: true, 
-                        tension: 0.3 
-                    }] 
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } }, 
-                    scales: { 
-                        y: { border: {display: false}, grid: {color: '#f1f5f9'}, ticks: { callback: function(v) { return '$' + v; } } }, 
-                        x: { border: {display: false}, grid: {display: false}, ticks: { maxTicksLimit: 10 } } 
-                    } 
-                }
+                data: { labels: trendLabels, datasets: [{ label: 'Impact', data: trendData, borderColor: '#6366f1', borderWidth: 3, pointBackgroundColor: '#fff', fill: true, backgroundColor: 'rgba(99, 102, 241, 0.1)', tension: 0.3 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { border: {display: false}, grid: {color: '#f1f5f9'} }, x: { border: {display: false}, grid: {display: false} } } }
             });
 
-            // Cash Flow (Bar)
             const ctxFlow = document.getElementById('cashflowChart').getContext('2d');
-            cashflowChartObj = new Chart(ctxFlow, { 
-                type: 'bar', 
-                data: { 
-                    labels: ['Income', 'Withdrawals'], 
-                    datasets: [{ 
-                        data: [income, expense], 
-                        backgroundColor: ['#10b981', '#f43f5e'], 
-                        borderRadius: 8, 
-                        barPercentage: 0.6 
-                    }] 
-                }, 
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } }, 
-                    scales: { 
-                        y: { border: {display: false}, grid: {color: '#f1f5f9'} }, 
-                        x: { border: {display: false}, grid: {display: false} } 
-                    } 
-                } 
-            });
+            cashflowChartObj = new Chart(ctxFlow, { type: 'bar', data: { labels: ['Income', 'Withdrawals'], datasets: [{ data: [income, expense], backgroundColor: ['#10b981', '#f43f5e'], borderRadius: 8 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
 
-            // Category Distribution (Doughnut)
-            const colorsCat = ['#4f46e5', '#ec4899', '#f59e0b', '#06b6d4', '#10b981', '#64748b', '#8b5cf6', '#a3e635'];
             const ctxCat = document.getElementById('categoryChart').getContext('2d');
-            categoryChartObj = new Chart(ctxCat, { 
-                type: 'doughnut', 
-                data: { 
-                    labels: Object.keys(expensesByCategory), 
-                    datasets: [{ 
-                        data: Object.values(expensesByCategory), 
-                        backgroundColor: colorsCat, 
-                        borderWidth: 0, 
-                        hoverOffset: 4 
-                    }] 
-                }, 
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    cutout: '75%', 
-                    plugins: { 
-                        legend: { position: 'right', labels: { usePointStyle: true, padding: 20, font: { weight: '600', size: 10 } } } 
-                    } 
-                } 
-            });
+            categoryChartObj = new Chart(ctxCat, { type: 'doughnut', data: { labels: Object.keys(expensesByCategory), datasets: [{ data: Object.values(expensesByCategory), backgroundColor: ['#4f46e5', '#ec4899', '#f59e0b', '#06b6d4', '#10b981', '#64748b'] }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right' } } } });
         }
 
-        // --- NAVIGATION & MODAL HELPERS ---
+        // --- ACTIONS & NAVIGATION ---
         window.switchTab = function(tabId) {
             ['ledger', 'templates', 'dashboard'].forEach(t => {
                 document.getElementById(`view-${t}`).classList.add('hide');
                 const navEl = document.getElementById(`nav-${t}`);
-                if(navEl) { 
-                    navEl.classList.remove('bg-brand-50', 'text-brand-600'); 
-                    navEl.classList.add('text-slate-500'); 
-                }
+                if(navEl) { navEl.classList.remove('bg-brand-50', 'text-brand-600'); navEl.classList.add('text-slate-500'); }
             });
             document.getElementById(`view-${tabId}`).classList.remove('hide');
             const activeNav = document.getElementById(`nav-${tabId}`);
-            if(activeNav) { 
-                activeNav.classList.add('bg-brand-50', 'text-brand-600'); 
-                activeNav.classList.remove('text-slate-500'); 
-            }
+            if(activeNav) { activeNav.classList.add('bg-brand-50', 'text-brand-600'); activeNav.classList.remove('text-slate-500'); }
             if(tabId === 'dashboard') renderDashboard();
             if(tabId === 'templates') renderTemplates();
         }
@@ -1235,12 +939,7 @@
             const select = document.getElementById(selectId);
             const currentVal = select.value;
             select.innerHTML = '';
-            categoryConfig[type].forEach(cat => { 
-                const opt = document.createElement('option'); 
-                opt.value = cat.name; 
-                opt.innerText = cat.name; 
-                select.appendChild(opt); 
-            });
+            categoryConfig[type].forEach(cat => { const opt = document.createElement('option'); opt.value = cat.name; opt.innerText = cat.name; select.appendChild(opt); });
             if(categoryConfig[type].find(c => c.name === currentVal)) select.value = currentVal;
         }
 
@@ -1258,10 +957,8 @@
 
         window.openTransactionModal = function() {
             document.getElementById('form-transaction').reset();
-            const year = state.currentDate.getFullYear(); 
-            const month = (state.currentDate.getMonth() + 1).toString().padStart(2, '0');
+            const year = state.currentDate.getFullYear(); const month = (state.currentDate.getMonth() + 1).toString().padStart(2, '0');
             document.getElementById('txn-date').value = `${year}-${month}-01`;
-            document.getElementById('txn-type').value = 'withdrawal'; 
             updateCategoryOptions('txn-category', 'withdrawal');
             openModal('transaction');
         }
@@ -1269,21 +966,41 @@
         window.openTemplateModal = function() {
             document.getElementById('form-template').reset();
             document.getElementById('tpl-id').value = '';
-            document.getElementById('tpl-modal-title').innerText = "New recurring Rule";
-            document.getElementById('tpl-save-btn').innerText = "Save Rule";
-            tempCustomDates = []; 
-            renderDraftCustomDates();
-            document.getElementById('tpl-type').value = 'withdrawal'; 
+            tempCustomDates = []; renderDraftCustomDates();
             updateCategoryOptions('tpl-category', 'withdrawal');
             document.querySelectorAll('.tpl-month-val, .tpl-day-val').forEach(cb => cb.checked = false);
             toggleFrequencyUI();
             openModal('template');
         }
 
+        window.handleTransactionSubmit = function(e) {
+            e.preventDefault();
+            const id = 't_' + Date.now();
+            setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), { id, date: document.getElementById('txn-date').value, name: document.getElementById('txn-name').value, amount: parseFloat(document.getElementById('txn-amount').value), type: document.getElementById('txn-type').value, category: document.getElementById('txn-category').value, status: 'unprocessed', comment: document.getElementById('txn-comment').value });
+            closeModal('transaction');
+        }
+
+        window.handleTemplateSubmit = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('tpl-id').value || 'tpl_' + Date.now();
+            const freq = document.getElementById('tpl-frequency').value;
+            let tpl = { id, name: document.getElementById('tpl-name').value, amount: parseFloat(document.getElementById('tpl-amount').value), type: document.getElementById('tpl-type').value, category: document.getElementById('tpl-category').value, frequency: freq, autoProcess: document.getElementById('tpl-autoprocess').checked, details: document.getElementById('tpl-details').value };
+            if(freq === 'monthly') tpl.monthlyDays = Array.from(document.querySelectorAll('.tpl-month-val:checked')).map(cb => parseInt(cb.value));
+            else if(freq === 'weekly') tpl.weeklyDays = Array.from(document.querySelectorAll('.tpl-day-val:checked')).map(cb => parseInt(cb.value));
+            else tpl.customDates = [...tempCustomDates];
+
+            await setDoc(doc(db, 'users', currentUser.uid, 'templates', id), tpl);
+            closeModal('template');
+        }
+
+        function getMonthlyTransactions() {
+            const mKey = getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
+            return state.transactions.filter(t => t.date.startsWith(mKey)).sort((a,b) => new Date(a.date) - new Date(b.date));
+        }
+
         function formatDate(dateStr) {
             const [y, m, d] = dateStr.split('-');
-            const date = new Date(y, m - 1, d);
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
     </script>
 </body>
