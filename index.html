@@ -728,17 +728,37 @@
             await batch.commit();
         }
 
-        async function injectTemplateIntoInitializedMonths(tpl) {
+        async function syncTemplateTransactions(tpl) {
             const batch = writeBatch(db);
             let needsCommit = false;
+
             state.initializedMonths.forEach(monthKey => {
                 const [y, m] = monthKey.split('-').map(Number);
-                const year = y;
-                const monthIndex = m - 1;
-                const existingDates = new Set(
-                    state.transactions.filter(t => t.templateId === tpl.id && t.date.startsWith(monthKey)).map(t => t.date)
-                );
-                getTemplateDatesForMonth(tpl, year, monthIndex).forEach(dateStr => {
+                const expectedDates = new Set(getTemplateDatesForMonth(tpl, y, m - 1));
+
+                // Existing transactions for this template in this month
+                const existing = state.transactions.filter(t => t.templateId === tpl.id && t.date.startsWith(monthKey));
+
+                existing.forEach(txn => {
+                    if (txn.status === 'unprocessed') {
+                        if (!expectedDates.has(txn.date)) {
+                            // Date no longer in template schedule — remove it
+                            batch.delete(doc(db, 'users', currentUser.uid, 'transactions', txn.id));
+                            needsCommit = true;
+                        } else {
+                            // Date still valid — update name/amount/category in case template was edited
+                            batch.update(doc(db, 'users', currentUser.uid, 'transactions', txn.id), {
+                                name: tpl.name, amount: tpl.amount, type: tpl.type,
+                                category: tpl.category, autoProcess: tpl.autoProcess || false
+                            });
+                            needsCommit = true;
+                        }
+                    }
+                });
+
+                // Create transactions for dates that have no entry yet
+                const existingDates = new Set(existing.map(t => t.date));
+                expectedDates.forEach(dateStr => {
                     if (!existingDates.has(dateStr)) {
                         const id = `tplgen_${tpl.id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
                         const txn = { id, templateId: tpl.id, date: dateStr, name: tpl.name, amount: tpl.amount, type: tpl.type, category: tpl.category, status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: '' };
@@ -1117,7 +1137,7 @@
             else tpl.customDates = [...tempCustomDates];
 
             await setDoc(doc(db, 'users', currentUser.uid, 'templates', id), tpl);
-            await injectTemplateIntoInitializedMonths(tpl);
+            await syncTemplateTransactions(tpl);
             closeModal('template');
         }
 
