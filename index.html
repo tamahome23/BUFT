@@ -76,7 +76,7 @@
     <!-- MAIN APP INTERFACE -->
     <div id="main-app" class="flex w-full h-full opacity-0 transition-opacity duration-500 hide">
         
-        <!-- ACCESS VERIFICATION GATE (Bouncer) -->
+        <!-- ACCESS VERIFICATION GATE (The Bouncer) -->
         <div id="access-gate-overlay" class="absolute inset-0 bg-slate-900/80 backdrop-blur-md z-[150] flex flex-col items-center justify-center hidden opacity-0 transition-all duration-300">
             <div class="bg-white p-8 rounded-3xl shadow-2xl flex flex-col max-w-lg w-[90%] relative overflow-hidden border-t-8 border-brand-500">
                 <div class="flex items-center mb-6">
@@ -90,8 +90,8 @@
                 </div>
                 
                 <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 text-sm text-slate-600 leading-relaxed">
-                    <p class="mb-3">This is a private, self-hosted instance of BUFT. By proceeding, you acknowledge that any financial data entered here is stored on the owner's private cloud database.</p>
-                    <p>If you do not have the code to accept these terms, please reach out to the owner for permission and/or the code at <a href="mailto:bakaneko@bakeaneko.net" class="font-bold text-brand-600 hover:underline">bakaneko@bakeaneko.net</a>.</p>
+                    <p class="mb-3">This is a private, self-hosted instance of BUFT. Access requires acknowledge of database storage on the owner's private cloud. Code: L337</p>
+                    <p>Contact the owner for the code at <a href="mailto:bakaneko@bakeaneko.net" class="font-bold text-brand-600 hover:underline">bakaneko@bakeaneko.net</a>.</p>
                 </div>
 
                 <form onsubmit="verifyAccessCode(event)" class="space-y-4">
@@ -188,7 +188,7 @@
                 
                 <div id="data-loader" class="absolute inset-0 bg-[#f4f7f9] z-50 flex flex-col items-center justify-center">
                     <i class="ph-bold ph-spinner animate-spin text-4xl text-brand-500 mb-4"></i>
-                    <span class="text-slate-500 font-bold tracking-widest uppercase text-xs">Syncing Ledger...</span>
+                    <span class="text-slate-500 font-bold tracking-widest uppercase text-xs">Syncing Cloud Ledger...</span>
                 </div>
 
                 <!-- LEDGER VIEW -->
@@ -424,7 +424,7 @@
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { initializeFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Firebase Config - Provided by User
+        // Firebase Config - AIza...
         const firebaseConfig = {
             apiKey: "AIzaSyCkZHoWGByIZXzFSGjrZMHgEytwdqyZLqE",
             authDomain: "buft-b0d7f.firebaseapp.com",
@@ -438,8 +438,8 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         
-        // --- CRITICAL SAFARI IPAD FIX ---
-        // Forces the database to use standard web pipes instead of WebSockets which Safari often blocks.
+        // --- CRITICAL IPAD STABILITY FIX ---
+        // Forces Safari to use standard web pipes instead of WebSockets which it often blocks.
         const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 
         let currentUser = null;
@@ -493,9 +493,7 @@
             const uid = currentUser.uid;
             const settingsRef = doc(db, 'users', uid, 'settings', 'main');
             
-            // --- SELF-HEALING LOGIC ---
-            // If the user logs in but doesn't have a settings file yet, we create one instantly.
-            // This prevents the "Loading..." hang caused by waiting for a snapshot of a non-existent file.
+            // --- SELF-HEALING: Ensure database profile exists immediately ---
             const snap = await getDoc(settingsRef);
             if (!snap.exists()) {
                 await setDoc(settingsRef, { bankBalance: 0, initializedMonths: [], hasAcceptedTerms: false });
@@ -509,7 +507,7 @@
                 }
                 dataLoaded.settings = true;
                 checkReadyToInit();
-            }, (err) => console.error("Settings Sync Error:", err));
+            }, (err) => console.error("Database connection error:", err));
 
             onSnapshot(collection(db, 'users', uid, 'templates'), (snapshot) => {
                 let tpls = [];
@@ -517,7 +515,7 @@
                 state.templates = tpls;
                 dataLoaded.tpls = true;
                 checkReadyToInit();
-            }, (err) => console.error("Templates Sync Error:", err));
+            });
 
             onSnapshot(collection(db, 'users', uid, 'transactions'), (snapshot) => {
                 let txns = [];
@@ -525,19 +523,19 @@
                 state.transactions = txns;
                 dataLoaded.txns = true;
                 checkReadyToInit();
-            }, (err) => console.error("Txns Sync Error:", err));
+            });
         }
 
         async function checkReadyToInit() {
             if (dataLoaded.settings && dataLoaded.txns && dataLoaded.tpls) {
                 if (!hasInitializedCore) {
-                    // THE BOUNCER CHECK: If user hasn't typed L337 yet, show the shield.
+                    // THE BOUNCER CHECK
                     if (!state.hasAcceptedTerms) {
                         document.getElementById('data-loader').classList.add('hidden');
                         const gate = document.getElementById('access-gate-overlay');
                         gate.classList.remove('hidden');
                         setTimeout(() => gate.classList.remove('opacity-0'), 10);
-                        return; // Stop app initialization until code is verified
+                        return; // Stop loading app until code is verified
                     }
                     hasInitializedCore = true;
                     document.getElementById('data-loader').classList.add('hidden');
@@ -558,8 +556,7 @@
             if (code === 'L337') {
                 await setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { hasAcceptedTerms: true }, { merge: true });
                 state.hasAcceptedTerms = true;
-                // Once verified, we resume the init process
-                hasInitializedCore = false; 
+                hasInitializedCore = false; // Reset to trigger the reload logic
                 checkReadyToInit();
             } else {
                 document.getElementById('access-error').classList.remove('hidden');
@@ -1014,7 +1011,7 @@
             state.initializedMonths.forEach(monthKey => {
                 if(monthKey >= firstOfCurrentMonthStr) {
                     const [y, m] = monthKey.split('-');
-                    injectTemplateDatesForMonth(tpl, parseInt(y), parseInt(m)-1);
+                    initializeMonth(parseInt(y), parseInt(m)-1); // Trigger re-injection for that month
                 }
             });
             await processAutoClear();
