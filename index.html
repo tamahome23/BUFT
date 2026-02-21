@@ -519,7 +519,8 @@
             initializedMonths: [], 
             transactions: [],
             templates: [],
-            hasAcceptedTerms: false
+            hasAcceptedTerms: false,
+            pastRowsCollapsed: true
         };
 
         // --- AUTH LOGIC ---
@@ -712,6 +713,23 @@
             else document.getElementById('archival-notice').classList.add('hide');
         }
 
+        window.togglePastRows = function() {
+            state.pastRowsCollapsed = !state.pastRowsCollapsed;
+            const rows = document.querySelectorAll('.past-ledger-row');
+            const icon = document.getElementById('past-toggle-icon');
+            const label = document.getElementById('past-toggle-label');
+            const count = rows.length;
+            if (state.pastRowsCollapsed) {
+                rows.forEach(r => r.style.display = 'none');
+                if (icon) icon.className = 'ph-fill ph-caret-right mr-1.5';
+                if (label) label.textContent = `(${count} past item${count !== 1 ? 's' : ''} hidden)`;
+            } else {
+                rows.forEach(r => r.style.display = '');
+                if (icon) icon.className = 'ph-fill ph-caret-down mr-1.5';
+                if (label) label.textContent = `(${count} past item${count !== 1 ? 's' : ''} shown)`;
+            }
+        }
+
         window.scrollToTodayDivider = function() {
             setTimeout(() => {
                 const divider = document.getElementById('today-divider');
@@ -831,16 +849,23 @@
             if(txns.length === 0) tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400 font-medium italic">No entries for this month. Templates will populate on first view.</td></tr>`;
 
             let dividerDrawn = false;
+            const pastRows = [];
+            const pastItemCount = txns.filter(t => t.date < todayStr).length;
 
             txns.forEach((txn) => {
                 if (!dividerDrawn && txn.date >= todayStr) {
-                    const hasPastItems = txns.some(t => t.date < todayStr);
-                    if (hasPastItems || txn.date === todayStr) {
-                        const divTr = document.createElement('tr');
-                        divTr.id = 'today-divider';
-                        divTr.className = 'bg-yellow-100/50 border-y-2 border-yellow-400';
-                        divTr.innerHTML = `<td colspan="7" class="py-2.5 px-6 text-center shadow-sm"><span class="text-[11px] font-extrabold uppercase tracking-widest text-yellow-800 flex items-center justify-center"><i class="ph-fill ph-star mr-1.5"></i> Today & Future</span></td>`;
-                        tbody.appendChild(divTr);
+                    if (pastItemCount > 0) {
+                        // Insert the collapsible toggle bar
+                        const toggleTr = document.createElement('tr');
+                        toggleTr.id = 'today-divider';
+                        toggleTr.className = 'bg-yellow-100/50 border-y-2 border-yellow-400 cursor-pointer select-none';
+                        toggleTr.onclick = () => window.togglePastRows();
+                        const collapsed = state.pastRowsCollapsed !== false;
+                        toggleTr.innerHTML = `<td colspan="7" class="py-2.5 px-6 text-center shadow-sm"><span class="text-[11px] font-extrabold uppercase tracking-widest text-yellow-800 flex items-center justify-center"><i class="ph-fill ph-caret-${collapsed ? 'right' : 'down'} mr-1.5" id="past-toggle-icon"></i><i class="ph-fill ph-star mr-1.5"></i> Today & Future <span class="ml-2 text-yellow-600 font-bold" id="past-toggle-label">(${pastItemCount} past item${pastItemCount !== 1 ? 's' : ''} ${collapsed ? 'hidden' : 'shown'})</span></span></td>`;
+                        tbody.appendChild(toggleTr);
+
+                        // Apply collapsed state to past rows
+                        if (collapsed) pastRows.forEach(r => r.style.display = 'none');
                     }
                     dividerDrawn = true;
                 }
@@ -903,8 +928,21 @@
                         </div>
                     </td>
                 `;
+                if (!dividerDrawn) { tr.classList.add('past-ledger-row'); pastRows.push(tr); }
                 tbody.appendChild(tr);
             });
+
+            // If all items are past (no future items triggered the divider), add toggle at the end
+            if (!dividerDrawn && pastRows.length > 0) {
+                const collapsed = state.pastRowsCollapsed !== false;
+                const toggleTr = document.createElement('tr');
+                toggleTr.id = 'today-divider';
+                toggleTr.className = 'bg-yellow-100/50 border-y-2 border-yellow-400 cursor-pointer select-none';
+                toggleTr.onclick = () => window.togglePastRows();
+                toggleTr.innerHTML = `<td colspan="7" class="py-2.5 px-6 text-center shadow-sm"><span class="text-[11px] font-extrabold uppercase tracking-widest text-yellow-800 flex items-center justify-center"><i class="ph-fill ph-caret-${collapsed ? 'right' : 'down'} mr-1.5" id="past-toggle-icon"></i><i class="ph-fill ph-star mr-1.5"></i> Past Items <span class="ml-2 text-yellow-600 font-bold" id="past-toggle-label">(${pastRows.length} item${pastRows.length !== 1 ? 's' : ''} ${collapsed ? 'hidden' : 'shown'})</span></span></td>`;
+                tbody.insertBefore(toggleTr, tbody.firstChild);
+                if (collapsed) pastRows.forEach(r => r.style.display = 'none');
+            }
 
             // Update the 4 metric cards
             document.getElementById('metric-withdrawals').innerText = `$${remainingWithdrawals.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
