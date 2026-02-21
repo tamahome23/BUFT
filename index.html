@@ -205,17 +205,29 @@
                         <span class="text-sm font-bold">Historical View: This month is in the past. Template changes will not alter these records.</span>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-center relative overflow-hidden">
-                            <div class="absolute top-0 right-0 p-4 opacity-5 text-slate-400"><i class="ph-fill ph-hourglass-high text-7xl"></i></div>
-                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 z-10">Remaining to Process</span>
-                            <div id="metric-remaining" class="text-3xl font-extrabold text-slate-900 mt-1 tracking-tight z-10">$0.00</div>
-                        </div>
-                        <div class="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-3xl shadow-xl shadow-slate-900/20 flex flex-col justify-center relative overflow-hidden text-white">
-                            <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-                            <div class="absolute top-0 right-0 p-4 opacity-10"><i class="ph-fill ph-check-circle text-7xl"></i></div>
-                            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 z-10">Projected EOM Balance</span>
-                            <div id="metric-projected" class="text-3xl font-extrabold mt-1 tracking-tight z-10 text-emerald-400">$0.00</div>
+                    <div class="sticky top-0 z-20 -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-4 bg-[#f4f7f9]">
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+                            <div class="bg-white p-4 lg:p-5 rounded-2xl border border-rose-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-3 opacity-5 text-rose-300"><i class="ph-fill ph-arrow-circle-down text-5xl"></i></div>
+                                <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-1 z-10">Withdrawals Left</span>
+                                <div id="metric-withdrawals" class="text-xl lg:text-2xl font-extrabold text-rose-600 tracking-tight z-10">$0.00</div>
+                            </div>
+                            <div class="bg-white p-4 lg:p-5 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-3 opacity-5 text-emerald-300"><i class="ph-fill ph-arrow-circle-up text-5xl"></i></div>
+                                <span class="text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1 z-10">Deposits Left</span>
+                                <div id="metric-deposits" class="text-xl lg:text-2xl font-extrabold text-emerald-600 tracking-tight z-10">$0.00</div>
+                            </div>
+                            <div class="bg-white p-4 lg:p-5 rounded-2xl border border-brand-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-3 opacity-5 text-brand-300"><i class="ph-fill ph-scales text-5xl"></i></div>
+                                <span class="text-[10px] font-bold text-brand-500 uppercase tracking-wider mb-1 z-10">Overall Delta</span>
+                                <div id="metric-delta" class="text-xl lg:text-2xl font-extrabold text-slate-900 tracking-tight z-10">$0.00</div>
+                            </div>
+                            <div class="bg-gradient-to-br from-slate-900 to-slate-800 p-4 lg:p-5 rounded-2xl shadow-lg shadow-slate-900/20 flex flex-col justify-center relative overflow-hidden text-white">
+                                <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+                                <div class="absolute top-0 right-0 p-3 opacity-10"><i class="ph-fill ph-bank text-5xl"></i></div>
+                                <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-1 z-10">Projected EOM</span>
+                                <div id="metric-projected" class="text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-emerald-400">$0.00</div>
+                            </div>
                         </div>
                     </div>
 
@@ -811,7 +823,7 @@
             tbody.innerHTML = '';
 
             const txns = getMonthlyTransactions();
-            let runningTotal = 0; let remainingImpact = 0;
+            let runningTotal = 0; let remainingWithdrawals = 0; let remainingDeposits = 0;
             const todayStr = REAL_CURRENT_DATE.toISOString().split('T')[0];
             const viewingMonthKey = getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
             const isViewingPastMonth = viewingMonthKey < CURRENT_MONTH_KEY;
@@ -833,8 +845,11 @@
                     dividerDrawn = true;
                 }
 
-                if (txn.type === 'deposit') { runningTotal += txn.amount; if (txn.status !== 'cleared') remainingImpact += txn.amount; } 
-                else { runningTotal -= txn.amount; if (txn.status !== 'cleared') remainingImpact -= txn.amount; }
+                // Cleared items are effectively $0 — they no longer impact the running total
+                if (txn.status !== 'cleared') {
+                    if (txn.type === 'deposit') { runningTotal += txn.amount; remainingDeposits += txn.amount; }
+                    else { runningTotal -= txn.amount; remainingWithdrawals += txn.amount; }
+                }
 
                 const isCleared = txn.status === 'cleared';
                 const isPast = txn.date < todayStr;
@@ -890,11 +905,23 @@
                 tbody.appendChild(tr);
             });
 
-            document.getElementById('metric-remaining').innerText = `${remainingImpact >= 0 ? '+' : ''}$${remainingImpact.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-            const projectedEom = state.bankBalance + remainingImpact;
+            // Update the 4 metric cards
+            document.getElementById('metric-withdrawals').innerText = `$${remainingWithdrawals.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            document.getElementById('metric-deposits').innerText = `$${remainingDeposits.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+            const delta = remainingDeposits - remainingWithdrawals;
+            const deltaEl = document.getElementById('metric-delta');
+            deltaEl.innerText = `${delta >= 0 ? '+' : ''}$${delta.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            deltaEl.className = delta < 0
+                ? 'text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-rose-600'
+                : 'text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-emerald-600';
+
+            const projectedEom = state.bankBalance + delta;
             const projEl = document.getElementById('metric-projected');
             projEl.innerText = `$${projectedEom.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-            projEl.className = projectedEom < 0 ? "text-3xl font-extrabold mt-1 tracking-tight z-10 text-rose-400" : "text-3xl font-extrabold mt-1 tracking-tight z-10 text-emerald-400";
+            projEl.className = projectedEom < 0
+                ? 'text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-rose-400'
+                : 'text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-emerald-400';
         }
 
         // --- RESTORED FEATURE: Template Grid Mechanics ---
