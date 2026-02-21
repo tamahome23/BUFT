@@ -80,7 +80,7 @@
     <div id="main-app" class="flex w-full h-full opacity-0 transition-opacity duration-500 hide">
         
         <!-- ACCESS VERIFICATION GATE (Bouncer) -->
-        <div id="access-gate-overlay" class="absolute inset-0 bg-slate-900/80 backdrop-blur-md z-[150] flex flex-col items-center justify-center hidden opacity-0 transition-all duration-300">
+        <div id="access-gate-overlay" class="absolute inset-0 bg-slate-900/80 backdrop-blur-md z-[150] flex flex-col items-center justify-center hide opacity-0 transition-all duration-300">
             <div class="bg-white p-8 rounded-3xl shadow-2xl flex flex-col max-w-lg w-[90%] relative overflow-hidden border-t-8 border-brand-500">
                 <div class="flex items-center mb-6">
                     <div class="bg-brand-100 p-3 rounded-full mr-4">
@@ -497,7 +497,17 @@
         async function setupCloudSync() {
             const uid = currentUser.uid;
             const settingsRef = doc(db, 'users', uid, 'settings', 'main');
-            
+
+            // Safety timeout: if data hasn't loaded in 15 seconds, force-hide the loader
+            // so the user isn't stuck forever on iPad
+            const safetyTimer = setTimeout(() => {
+                console.warn("BUFT: Safety timeout hit - forcing loader off");
+                const loader = document.getElementById('data-loader');
+                if (loader && !loader.classList.contains('hide')) {
+                    loader.classList.add('hide');
+                }
+            }, 15000);
+
             // --- SELF-HEALING: Check for existence immediately to prevent the "Syncing" loop ---
             try {
                 const snap = await getDoc(settingsRef);
@@ -513,50 +523,58 @@
                         state.hasAcceptedTerms = docSnap.data().hasAcceptedTerms || false;
                     }
                     dataLoaded.settings = true;
-                    checkReadyToInit();
+                    checkReadyToInit(safetyTimer);
                 }, (err) => console.error("Database connection error:", err));
 
                 onSnapshot(collection(db, 'users', uid, 'templates'), (snapshot) => {
                     let tpls = [];
-                    snapshot.forEach(doc => tpls.push(doc.data()));
+                    snapshot.forEach(d => tpls.push(d.data()));
                     state.templates = tpls;
                     dataLoaded.tpls = true;
-                    checkReadyToInit();
+                    checkReadyToInit(safetyTimer);
                 });
 
                 onSnapshot(collection(db, 'users', uid, 'transactions'), (snapshot) => {
                     let txns = [];
-                    snapshot.forEach(doc => txns.push(doc.data()));
+                    snapshot.forEach(d => txns.push(d.data()));
                     state.transactions = txns;
                     dataLoaded.txns = true;
-                    checkReadyToInit();
+                    checkReadyToInit(safetyTimer);
                 });
             } catch (err) {
                 console.error("Initial Cloud Connection Failure:", err);
+                clearTimeout(safetyTimer);
+                // Force-hide loader on connection failure so user isn't stuck
+                document.getElementById('data-loader').classList.add('hide');
             }
         }
 
-        async function checkReadyToInit() {
-            if (dataLoaded.settings && dataLoaded.txns && dataLoaded.tpls) {
-                if (!hasInitializedCore) {
-                    // THE BOUNCER CHECK
-                    if (!state.hasAcceptedTerms) {
-                        document.getElementById('data-loader').classList.add('hidden');
-                        const gate = document.getElementById('access-gate-overlay');
-                        gate.classList.remove('hidden');
-                        setTimeout(() => gate.classList.remove('opacity-0'), 10);
-                        return; 
-                    }
-                    hasInitializedCore = true;
-                    document.getElementById('data-loader').classList.add('hidden');
-                    document.getElementById('access-gate-overlay').classList.add('hide');
+        async function checkReadyToInit(safetyTimer) {
+            if (!(dataLoaded.settings && dataLoaded.txns && dataLoaded.tpls)) return;
+
+            if (!hasInitializedCore) {
+                // THE BOUNCER CHECK
+                if (!state.hasAcceptedTerms) {
+                    document.getElementById('data-loader').classList.add('hide');
+                    const gate = document.getElementById('access-gate-overlay');
+                    gate.classList.remove('hide');
+                    setTimeout(() => gate.classList.remove('opacity-0'), 10);
+                    return;
+                }
+                hasInitializedCore = true;
+                if (safetyTimer) clearTimeout(safetyTimer);
+                document.getElementById('data-loader').classList.add('hide');
+                const gate = document.getElementById('access-gate-overlay');
+                gate.classList.add('opacity-0');
+                setTimeout(() => { gate.classList.add('hide'); }, 300);
+                try {
                     await initializeMonth(state.currentDate.getFullYear(), state.currentDate.getMonth());
                     await processAutoClear();
-                    renderApp();
-                    scrollToTodayDivider();
-                } else {
-                    renderApp();
-                }
+                } catch(e) { console.error("Init month error:", e); }
+                renderApp();
+                scrollToTodayDivider();
+            } else {
+                renderApp();
             }
         }
 
@@ -566,9 +584,18 @@
             if (code === 'L337') {
                 await setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { hasAcceptedTerms: true }, { merge: true });
                 state.hasAcceptedTerms = true;
-                // Reload Core to proceed
-                hasInitializedCore = false;
-                checkReadyToInit();
+                // Proceed past bouncer — hide the gate and initialize
+                hasInitializedCore = true;
+                const gate = document.getElementById('access-gate-overlay');
+                gate.classList.add('opacity-0');
+                setTimeout(() => { gate.classList.add('hide'); }, 300);
+                document.getElementById('data-loader').classList.add('hide');
+                try {
+                    await initializeMonth(state.currentDate.getFullYear(), state.currentDate.getMonth());
+                    await processAutoClear();
+                } catch(e) { console.error("Init after verify error:", e); }
+                renderApp();
+                scrollToTodayDivider();
             } else {
                 document.getElementById('access-error').classList.remove('hidden');
             }
@@ -597,11 +624,6 @@
 
         let tempCustomDates = []; 
         let cashflowChartObj = null; let categoryChartObj = null; let balanceTrendChartObj = null;
-
-        setupWeeklyCheckboxes();
-        setupMonthlyGrid();
-        updateCategoryOptions('txn-category', 'withdrawal');
-        updateCategoryOptions('tpl-category', 'withdrawal');
 
         function getCatColorClass(type, catName) {
             const list = categoryConfig[type] || [];
@@ -677,18 +699,18 @@
                 const monthStr = (monthIndex + 1).toString().padStart(2, '0');
                 let datesToInject = [];
 
-                if (tpl.frequency === 'monthly') {
+                if (tpl.frequency === 'monthly' && Array.isArray(tpl.monthlyDays)) {
                     tpl.monthlyDays.forEach(day => {
-                        const d = Math.min(day, new Date(year, monthIndex + 1, 0).getDate()); 
+                        const d = Math.min(day, new Date(year, monthIndex + 1, 0).getDate());
                         datesToInject.push(`${year}-${monthStr}-${d.toString().padStart(2, '0')}`);
                     });
-                } else if (tpl.frequency === 'weekly') {
+                } else if (tpl.frequency === 'weekly' && Array.isArray(tpl.weeklyDays)) {
                     let date = new Date(year, monthIndex, 1);
                     while (date.getMonth() === monthIndex) {
                         if (tpl.weeklyDays.includes(date.getDay())) datesToInject.push(`${year}-${monthStr}-${date.getDate().toString().padStart(2, '0')}`);
                         date.setDate(date.getDate() + 1);
                     }
-                } else if (tpl.frequency === 'custom') {
+                } else if (tpl.frequency === 'custom' && Array.isArray(tpl.customDates)) {
                     tpl.customDates.forEach(cd => {
                         const [m, d] = cd.split('/');
                         if (parseInt(m) === monthIndex + 1) datesToInject.push(`${year}-${monthStr}-${d.padStart(2, '0')}`);
@@ -921,6 +943,87 @@
             categoryChartObj = new Chart(ctxCat, { type: 'doughnut', data: { labels: Object.keys(expensesByCategory), datasets: [{ data: Object.values(expensesByCategory), backgroundColor: ['#4f46e5', '#ec4899', '#f59e0b', '#06b6d4', '#10b981', '#64748b'] }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right' } } } });
         }
 
+        // --- MISSING CRITICAL FUNCTIONS: Status, Delete, Edit, Comments ---
+        window.updateStatus = function(txnId, newStatus) {
+            setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), { status: newStatus }, { merge: true });
+        }
+
+        window.deleteTransaction = async function(txnId) {
+            if (!confirm('Delete this ledger entry?')) return;
+            await deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId));
+        }
+
+        window.deleteTemplate = async function(tplId) {
+            if (!confirm('Delete this recurring rule? Future months will no longer generate entries from it.')) return;
+            await deleteDoc(doc(db, 'users', currentUser.uid, 'templates', tplId));
+        }
+
+        window.editTemplate = function(tplId) {
+            const tpl = state.templates.find(t => t.id === tplId);
+            if (!tpl) return;
+            document.getElementById('tpl-id').value = tpl.id;
+            document.getElementById('tpl-name').value = tpl.name;
+            document.getElementById('tpl-amount').value = tpl.amount;
+            document.getElementById('tpl-type').value = tpl.type;
+            updateCategoryOptions('tpl-category', tpl.type);
+            document.getElementById('tpl-category').value = tpl.category;
+            document.getElementById('tpl-details').value = tpl.details || '';
+            document.getElementById('tpl-autoprocess').checked = tpl.autoProcess || false;
+            document.getElementById('tpl-frequency').value = tpl.frequency;
+            document.getElementById('tpl-modal-title').innerText = 'Edit Template';
+            toggleFrequencyUI();
+
+            // Reset all checkboxes first
+            document.querySelectorAll('.tpl-month-val, .tpl-day-val').forEach(cb => cb.checked = false);
+            tempCustomDates = [];
+
+            if (tpl.frequency === 'monthly' && tpl.monthlyDays) {
+                tpl.monthlyDays.forEach(day => {
+                    const cb = document.querySelector(`.tpl-month-val[value="${day}"]`);
+                    if (cb) cb.checked = true;
+                });
+            } else if (tpl.frequency === 'weekly' && tpl.weeklyDays) {
+                tpl.weeklyDays.forEach(day => {
+                    const cb = document.querySelector(`.tpl-day-val[value="${day}"]`);
+                    if (cb) cb.checked = true;
+                });
+            } else if (tpl.frequency === 'custom' && tpl.customDates) {
+                tempCustomDates = [...tpl.customDates];
+                renderDraftCustomDates();
+            }
+
+            openModal('template');
+        }
+
+        window.openCommentModal = function(txnId) {
+            const txn = state.transactions.find(t => t.id === txnId);
+            if (!txn) return;
+            document.getElementById('edit-comment-id').value = txnId;
+            document.getElementById('edit-comment-text').value = txn.comment || '';
+            openModal('comment');
+        }
+
+        window.saveLedgerComment = function() {
+            const txnId = document.getElementById('edit-comment-id').value;
+            const text = document.getElementById('edit-comment-text').value.trim();
+            setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), { comment: text }, { merge: true });
+            closeModal('comment');
+        }
+
+        window.setTemplateView = function(mode) {
+            state.templateViewMode = mode;
+            const btnCat = document.getElementById('btn-view-cat');
+            const btnRec = document.getElementById('btn-view-rec');
+            if (mode === 'category') {
+                btnCat.className = 'px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-brand-600 shadow-sm transition-all';
+                btnRec.className = 'px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all';
+            } else {
+                btnRec.className = 'px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-brand-600 shadow-sm transition-all';
+                btnCat.className = 'px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all';
+            }
+            renderTemplates();
+        }
+
         // --- ACTIONS & NAVIGATION ---
         window.switchTab = function(tabId) {
             ['ledger', 'templates', 'dashboard'].forEach(t => {
@@ -1002,6 +1105,12 @@
             const [y, m, d] = dateStr.split('-');
             return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
+
+        // --- INIT: Must run AFTER all window.xxx assignments above ---
+        setupWeeklyCheckboxes();
+        setupMonthlyGrid();
+        updateCategoryOptions('txn-category', 'withdrawal');
+        updateCategoryOptions('tpl-category', 'withdrawal');
     </script>
 </body>
 </html>
