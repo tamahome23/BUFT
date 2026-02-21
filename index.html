@@ -861,8 +861,9 @@
                         rowBgClass = 'bg-rose-50/80 hover:bg-rose-100/80 border-l-4 border-rose-400';
                         warningIcon = `<i class="ph-fill ph-warning-circle text-rose-500 mr-1.5" title="Past Due / Uncleared"></i>`;
                         dateColor = 'text-rose-600 font-extrabold';
-                    } else rowBgClass = 'bg-slate-100/70 border-l-4 border-transparent';
-                } else rowBgClass = 'bg-white hover:bg-slate-50 border-l-4 border-transparent';
+                    } else rowBgClass = 'bg-slate-200/80 border-l-4 border-transparent';
+                } else if (isCleared) rowBgClass = 'bg-slate-200/70 border-l-4 border-transparent';
+                else rowBgClass = 'bg-white hover:bg-slate-50 border-l-4 border-transparent';
                 
                 const amountColor = txn.type === 'deposit' ? 'text-emerald-600' : 'text-slate-900';
                 const amountPrefix = txn.type === 'deposit' ? '+' : '';
