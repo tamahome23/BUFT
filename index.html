@@ -732,7 +732,11 @@
             const batch = writeBatch(db);
             let needsCommit = false;
 
-            state.initializedMonths.forEach(monthKey => {
+            // Ensure current viewed month is always included even if initializedMonths is stale
+            const currentMonthKey = getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
+            const monthsToSync = [...new Set([...state.initializedMonths, currentMonthKey])];
+
+            monthsToSync.forEach(monthKey => {
                 const [y, m] = monthKey.split('-').map(Number);
                 const expectedDates = new Set(getTemplateDatesForMonth(tpl, y, m - 1));
 
@@ -1137,8 +1141,11 @@
             else tpl.customDates = [...tempCustomDates];
 
             await setDoc(doc(db, 'users', currentUser.uid, 'templates', id), tpl);
-            await syncTemplateTransactions(tpl);
             closeModal('template');
+            try {
+                await syncTemplateTransactions(tpl);
+            } catch(e) { console.error("Template sync error:", e); }
+            renderApp();
         }
 
         function getMonthlyTransactions() {
