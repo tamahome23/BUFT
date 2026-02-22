@@ -302,6 +302,10 @@
                         <h3 class="font-bold text-slate-800 mb-6 flex items-center"><i class="ph-fill ph-trend-up text-brand-500 mr-2 text-xl"></i> Running Impact Trend</h3>
                         <div class="relative h-64 w-full"><canvas id="balanceTrendChart"></canvas></div>
                     </div>
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                        <h3 class="font-bold text-slate-800 mb-6 flex items-center"><i class="ph-fill ph-calendar-dots text-brand-500 mr-2 text-xl"></i> Year Overview <span id="yearOverviewLabel" class="ml-2 text-sm font-semibold text-slate-400"></span></h3>
+                        <div class="relative h-80 w-full"><canvas id="yearOverviewChart"></canvas></div>
+                    </div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                             <h3 class="font-bold text-slate-800 mb-6 flex items-center"><i class="ph-fill ph-scales text-brand-500 mr-2 text-xl"></i> Cash Flow</h3>
@@ -768,7 +772,7 @@
         const daysOfWeek = [ { id: 0, label: 'S' }, { id: 1, label: 'M' }, { id: 2, label: 'T' }, { id: 3, label: 'W' }, { id: 4, label: 'T' }, { id: 5, label: 'F' }, { id: 6, label: 'S' } ];
 
         let tempCustomDates = []; 
-        let cashflowChartObj = null; let categoryChartObj = null; let balanceTrendChartObj = null;
+        let cashflowChartObj = null; let categoryChartObj = null; let balanceTrendChartObj = null; let yearOverviewChartObj = null;
 
         function getCatColorClass(type, catName) {
             const list = categoryConfig[type] || [];
@@ -1248,6 +1252,7 @@
             if(cashflowChartObj) cashflowChartObj.destroy();
             if(categoryChartObj) categoryChartObj.destroy();
             if(balanceTrendChartObj) balanceTrendChartObj.destroy();
+            if(yearOverviewChartObj) yearOverviewChartObj.destroy();
 
             Chart.defaults.font.family = '"Plus Jakarta Sans", sans-serif';
 
@@ -1263,6 +1268,104 @@
 
             const ctxCat = document.getElementById('categoryChart').getContext('2d');
             categoryChartObj = new Chart(ctxCat, { type: 'doughnut', data: { labels: Object.keys(expensesByCategory), datasets: [{ data: Object.values(expensesByCategory), backgroundColor: ['#4f46e5', '#ec4899', '#f59e0b', '#06b6d4', '#10b981', '#64748b'] }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right' } } } });
+
+            // --- Year Overview Chart (Jan–Dec) ---
+            const viewYear = state.currentDate.getFullYear();
+            const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const currentMonthIdx = REAL_CURRENT_DATE.getMonth();
+            const currentYear = REAL_CURRENT_DATE.getFullYear();
+            const eomData = []; const depData = []; const wdData = [];
+            const depColors = []; const wdColors = []; const eomPointColors = []; const eomPointRadius = [];
+
+            for (let m = 0; m < 12; m++) {
+                const mk = getMonthKey(viewYear, m);
+                const bankBal = resolveAutoCarryBalance(mk);
+                const monthTxns = state.transactions.filter(t => t.date.startsWith(mk));
+                let deposits = 0, withdrawals = 0, unclearedDep = 0, unclearedWd = 0;
+                monthTxns.forEach(t => {
+                    if (t.type === 'deposit') { deposits += t.amount; if (t.status !== 'cleared') unclearedDep += t.amount; }
+                    else { withdrawals += t.amount; if (t.status !== 'cleared') unclearedWd += t.amount; }
+                });
+                const projectedEom = bankBal + unclearedDep - unclearedWd;
+                eomData.push(monthTxns.length > 0 || state.monthlyBalances[mk] ? projectedEom : null);
+                depData.push(deposits || null);
+                wdData.push(withdrawals || null);
+
+                const isCurrent = (viewYear === currentYear && m === currentMonthIdx);
+                depColors.push(isCurrent ? '#059669' : '#10b981');
+                wdColors.push(isCurrent ? '#e11d48' : '#f43f5e');
+                eomPointColors.push(isCurrent ? '#4338ca' : '#6366f1');
+                eomPointRadius.push(isCurrent ? 7 : 4);
+            }
+
+            document.getElementById('yearOverviewLabel').textContent = viewYear;
+
+            const ctxYear = document.getElementById('yearOverviewChart').getContext('2d');
+            yearOverviewChartObj = new Chart(ctxYear, {
+                type: 'bar',
+                data: {
+                    labels: monthLabels,
+                    datasets: [
+                        {
+                            type: 'line', label: 'Projected EoM', data: eomData, borderColor: '#6366f1', borderWidth: 3,
+                            pointBackgroundColor: eomPointColors, pointRadius: eomPointRadius, pointBorderColor: '#fff', pointBorderWidth: 2,
+                            fill: false, tension: 0.3, yAxisID: 'y', order: 0, spanGaps: true
+                        },
+                        {
+                            label: 'Deposits', data: depData, backgroundColor: depColors,
+                            borderRadius: 6, yAxisID: 'y', order: 1, barPercentage: 0.7, categoryPercentage: 0.8
+                        },
+                        {
+                            label: 'Withdrawals', data: wdData, backgroundColor: wdColors,
+                            borderRadius: 6, yAxisID: 'y', order: 2, barPercentage: 0.7, categoryPercentage: 0.8
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { usePointStyle: true, padding: 20, font: { size: 11, weight: '600' } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.dataset.label}: $${(ctx.parsed.y || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}`,
+                                title: items => { const m = items[0].dataIndex; return (viewYear === currentYear && m === currentMonthIdx) ? `${items[0].label} (Current)` : items[0].label; }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            border: { display: false }, grid: { color: '#f1f5f9' },
+                            ticks: { callback: v => '$' + v.toLocaleString() }
+                        },
+                        x: {
+                            border: { display: false }, grid: { display: false },
+                            ticks: {
+                                font: function(ctx) {
+                                    return (viewYear === currentYear && ctx.index === currentMonthIdx)
+                                        ? { weight: '800', size: 13 } : { weight: '500', size: 11 };
+                                },
+                                color: function(ctx) {
+                                    return (viewYear === currentYear && ctx.index === currentMonthIdx) ? '#4f46e5' : '#64748b';
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'currentMonthHighlight',
+                    beforeDraw(chart) {
+                        if (viewYear !== currentYear) return;
+                        const { ctx: c, chartArea, scales: { x } } = chart;
+                        const barWidth = x.getPixelForValue(1) - x.getPixelForValue(0);
+                        const xPos = x.getPixelForValue(currentMonthIdx) - barWidth / 2;
+                        c.save();
+                        c.fillStyle = 'rgba(99, 102, 241, 0.06)';
+                        c.roundRect(xPos, chartArea.top, barWidth, chartArea.bottom - chartArea.top, 8);
+                        c.fill();
+                        c.restore();
+                    }
+                }]
+            });
         }
 
         // --- MISSING CRITICAL FUNCTIONS: Status, Delete, Edit, Comments ---
