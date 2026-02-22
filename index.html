@@ -2064,7 +2064,10 @@ ${buildWashuContext()}`;
                 const timeout = setTimeout(() => controller.abort(), 60000);
                 startWashuTimer('Sent');
                 const payloadJson = JSON.stringify(payload);
-                console.log('Washu payload size:', payloadJson.length, 'chars');
+                const systemPromptLen = getWashuSystemPrompt().length;
+                const convoLen = JSON.stringify(washuConversation).length;
+                const approxTokens = Math.ceil(payloadJson.length / 4);
+                console.log(`Washu payload: ${payloadJson.length} chars (~${approxTokens} tokens), system prompt: ${systemPromptLen} chars, conversation: ${convoLen} chars`);
 
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${washuGeminiKey}`;
                 const fetchOpts = {
@@ -2090,7 +2093,13 @@ ${buildWashuContext()}`;
                     clearTimeout(timeout);
                     const errBody = await response.text();
                     console.error('Washu API raw error:', response.status, errBody);
-                    throw new Error(`API error ${response.status}: ${errBody.substring(0, 500)}`);
+                    // Try to extract the specific error message from Google's JSON response
+                    let googleMsg = '';
+                    try {
+                        const errJson = JSON.parse(errBody);
+                        googleMsg = errJson?.error?.message || '';
+                    } catch(_) {}
+                    throw new Error(`API error ${response.status}: ${googleMsg || errBody.substring(0, 500)}`);
                 }
 
                 const result = await response.json();
@@ -2125,12 +2134,20 @@ ${buildWashuContext()}`;
                 } else if (err.message.includes('API error 401') || err.message.includes('API error 403')) {
                     errorMsg += 'Your API key seems invalid or unauthorized. Double-check it in Settings.';
                 } else if (err.message.includes('API error 429')) {
-                    errorMsg += 'Rate limit hit even after retrying. Google\'s free tier has per-minute limits — wait a minute and try again.';
+                    const detail429 = err.message.replace('API error 429: ', '');
+                    errorMsg += `Rate limit hit even after retrying. Google says: "${detail429.substring(0, 200)}"`;
                 } else {
                     errorMsg += err.message;
                 }
 
-                target.innerHTML = `<span class="text-rose-600">${errorMsg}</span>`;
+                // Show diagnostics so we can debug persistent failures
+                const diagParts = [];
+                if (typeof payloadJson !== 'undefined') diagParts.push(`payload: ${payloadJson.length} chars (~${Math.ceil(payloadJson.length / 4)} tokens)`);
+                if (typeof systemPromptLen !== 'undefined') diagParts.push(`system prompt: ${systemPromptLen} chars`);
+                if (typeof convoLen !== 'undefined') diagParts.push(`conversation: ${convoLen} chars`);
+                const diagLine = diagParts.length ? `<br><span class="text-[10px] text-slate-400 mt-1 block">${diagParts.join(' · ')}</span>` : '';
+
+                target.innerHTML = `<span class="text-rose-600">${errorMsg}</span>${diagLine}`;
                 // Remove the failed message from conversation
                 washuConversation.pop();
             } finally {
