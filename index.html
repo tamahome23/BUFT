@@ -1972,12 +1972,14 @@ ${buildWashuContext()}`;
                 target.classList.remove('washu-typing');
 
                 let errorMsg = 'Hmm, even a genius hits a snag sometimes. ';
-                if (err.message.includes('401') || err.message.includes('403')) {
-                    errorMsg += 'Your API key seems invalid. Check it in Settings.';
-                } else if (err.message.includes('429')) {
-                    errorMsg += 'Rate limit hit — give it a moment and try again.';
+                if (err.message.includes('API error 400')) {
+                    errorMsg += 'Bad request — the API rejected the payload. Check the browser console for details.';
+                } else if (err.message.includes('API error 401') || err.message.includes('API error 403')) {
+                    errorMsg += 'Your API key seems invalid or unauthorized. Double-check it in Settings.';
+                } else if (err.message.includes('API error 429')) {
+                    errorMsg += 'Rate limit hit — wait a minute and try again. If this is a brand-new key, it may need a moment to activate.';
                 } else {
-                    errorMsg += `Error: ${err.message}`;
+                    errorMsg += err.message;
                 }
 
                 target.innerHTML = `<span class="text-rose-600">${errorMsg}</span>`;
