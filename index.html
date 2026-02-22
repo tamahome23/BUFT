@@ -179,10 +179,14 @@
                 </div>
                 
                 <div class="flex items-center gap-3 lg:gap-6">
-                    <div class="flex items-center bg-slate-50 px-4 py-2 rounded-full border border-slate-200 shadow-sm">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2 hidden md:block">Bank:</span>
+                    <div class="flex items-center bg-slate-50 px-4 py-2 rounded-full border border-slate-200 shadow-sm gap-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden md:block">Bank:</span>
                         <span class="text-slate-400 font-bold">$</span>
-                        <input type="number" id="manual-bank-balance" class="font-extrabold text-slate-800 w-24 outline-none bg-transparent" onchange="updateBankBalance(this.value)">
+                        <input type="number" id="manual-bank-balance" class="font-extrabold text-slate-800 w-24 outline-none bg-transparent disabled:text-slate-400 disabled:cursor-not-allowed" onchange="updateBankBalance(this.value)">
+                        <label class="flex items-center gap-1 cursor-pointer ml-1 border-l border-slate-200 pl-2" title="Auto-carry: use previous month's end-of-month balance">
+                            <input type="checkbox" id="auto-carry-checkbox" class="accent-brand-500 w-3.5 h-3.5 cursor-pointer" onchange="toggleAutoCarry(this.checked)">
+                            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider hidden md:block">Auto</span>
+                        </label>
                     </div>
                     
                     <button onclick="openTransactionModal()" class="bg-slate-900 hover:bg-brand-600 text-white p-2 lg:px-5 lg:py-2.5 rounded-full font-semibold shadow-lg shadow-slate-900/20 flex items-center transition-all transform hover:scale-105">
@@ -513,10 +517,10 @@
         const WINDOW_END = new Date(2026, 11, 31);
 
         window.state = {
-            currentDate: new Date(REAL_CURRENT_DATE), 
-            bankBalance: 0,
-            templateViewMode: 'category', 
-            initializedMonths: [], 
+            currentDate: new Date(REAL_CURRENT_DATE),
+            monthlyBalances: {},
+            templateViewMode: 'category',
+            initializedMonths: [],
             transactions: [],
             templates: [],
             hasAcceptedTerms: false,
@@ -571,14 +575,25 @@
                 const snap = await getDoc(settingsRef);
                 if (!snap.exists()) {
                     // Start fresh if user doc doesn't exist (e.g. after a purge)
-                    await setDoc(settingsRef, { bankBalance: 0, initializedMonths: [], hasAcceptedTerms: false });
+                    await setDoc(settingsRef, { monthlyBalances: {}, initializedMonths: [], hasAcceptedTerms: false });
                 }
 
                 onSnapshot(settingsRef, (docSnap) => {
                     if(docSnap.exists()) {
-                        state.bankBalance = docSnap.data().bankBalance || 0;
-                        state.initializedMonths = docSnap.data().initializedMonths || [];
-                        state.hasAcceptedTerms = docSnap.data().hasAcceptedTerms || false;
+                        const data = docSnap.data();
+                        // Migration: old single bankBalance → per-month format
+                        if (data.monthlyBalances) {
+                            state.monthlyBalances = data.monthlyBalances;
+                        } else if (typeof data.bankBalance === 'number') {
+                            const currentKey = getMonthKey(REAL_CURRENT_DATE.getFullYear(), REAL_CURRENT_DATE.getMonth());
+                            state.monthlyBalances = { [currentKey]: { amount: data.bankBalance, autoCarry: false } };
+                            // Persist migrated format back to Firestore
+                            setDoc(settingsRef, { monthlyBalances: state.monthlyBalances }, { merge: true });
+                        } else {
+                            state.monthlyBalances = {};
+                        }
+                        state.initializedMonths = data.initializedMonths || [];
+                        state.hasAcceptedTerms = data.hasAcceptedTerms || false;
                     }
                     dataLoaded.settings = true;
                     checkReadyToInit(safetyTimer);
@@ -699,7 +714,22 @@
         function updateHeader() {
             const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
             document.getElementById('current-month-display').innerText = `${monthNames[state.currentDate.getMonth()]} ${state.currentDate.getFullYear()}`;
-            document.getElementById('manual-bank-balance').value = state.bankBalance.toFixed(2);
+
+            const key = getCurrentMonthKey();
+            const entry = getMonthBalanceEntry(key);
+            const balanceInput = document.getElementById('manual-bank-balance');
+            const autoCarryCb = document.getElementById('auto-carry-checkbox');
+
+            if (entry.autoCarry) {
+                const carried = resolveAutoCarryBalance(key);
+                balanceInput.value = carried.toFixed(2);
+                balanceInput.disabled = true;
+                autoCarryCb.checked = true;
+            } else {
+                balanceInput.value = entry.amount.toFixed(2);
+                balanceInput.disabled = false;
+                autoCarryCb.checked = false;
+            }
 
             const btnPrev = document.getElementById('btn-prev-month');
             const btnNext = document.getElementById('btn-next-month');
@@ -754,9 +784,88 @@
             scrollToTodayDivider();
         }
 
+        function getCurrentMonthKey() {
+            return getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
+        }
+
+        function getMonthBalanceEntry(monthKey) {
+            return state.monthlyBalances[monthKey] || { amount: 0, autoCarry: false };
+        }
+
+        function getNetDeltaForMonth(monthKey) {
+            const [year, month] = monthKey.split('-').map(Number);
+            const txns = state.transactions.filter(t => {
+                const d = new Date(t.date + 'T00:00:00');
+                return d.getFullYear() === year && (d.getMonth() + 1) === month;
+            });
+            let delta = 0;
+            txns.forEach(t => {
+                if (t.status !== 'cleared') {
+                    delta += t.type === 'deposit' ? t.amount : -t.amount;
+                }
+            });
+            return delta;
+        }
+
+        function getPrevMonthKey(monthKey) {
+            const [year, month] = monthKey.split('-').map(Number);
+            const d = new Date(year, month - 2, 1);
+            return getMonthKey(d.getFullYear(), d.getMonth());
+        }
+
+        function resolveAutoCarryBalance(monthKey, visited) {
+            if (!visited) visited = new Set();
+            if (visited.has(monthKey)) return 0;
+            visited.add(monthKey);
+
+            const entry = getMonthBalanceEntry(monthKey);
+            if (!entry.autoCarry) return entry.amount;
+
+            // Auto-carry: previous month's starting balance + previous month's full delta (all txns, not just uncleared)
+            const prevKey = getPrevMonthKey(monthKey);
+            const prevStarting = resolveAutoCarryBalance(prevKey, visited);
+
+            // For the carry, we use ALL transactions (including cleared) since cleared means it already hit the bank
+            const [year, month] = prevKey.split('-').map(Number);
+            const prevTxns = state.transactions.filter(t => {
+                const d = new Date(t.date + 'T00:00:00');
+                return d.getFullYear() === year && (d.getMonth() + 1) === month;
+            });
+            let prevFullDelta = 0;
+            prevTxns.forEach(t => {
+                prevFullDelta += t.type === 'deposit' ? t.amount : -t.amount;
+            });
+
+            return prevStarting + prevFullDelta;
+        }
+
+        function getBankBalanceForCurrentMonth() {
+            return resolveAutoCarryBalance(getCurrentMonthKey());
+        }
+
         window.updateBankBalance = function(val) {
             const num = parseFloat(val) || 0;
-            setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { bankBalance: num }, { merge: true });
+            const key = getCurrentMonthKey();
+            state.monthlyBalances[key] = { amount: num, autoCarry: false };
+            // Uncheck auto-carry since user manually typed a value
+            const cb = document.getElementById('auto-carry-checkbox');
+            if (cb) cb.checked = false;
+            setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { monthlyBalances: state.monthlyBalances }, { merge: true });
+        }
+
+        window.toggleAutoCarry = function(checked) {
+            const key = getCurrentMonthKey();
+            const entry = getMonthBalanceEntry(key);
+            if (checked) {
+                const carried = resolveAutoCarryBalance(key);
+                state.monthlyBalances[key] = { amount: carried, autoCarry: true };
+                document.getElementById('manual-bank-balance').value = carried.toFixed(2);
+                document.getElementById('manual-bank-balance').disabled = true;
+            } else {
+                state.monthlyBalances[key] = { amount: entry.amount, autoCarry: false };
+                document.getElementById('manual-bank-balance').disabled = false;
+            }
+            setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { monthlyBalances: state.monthlyBalances }, { merge: true });
         }
 
         // --- ASYNC CLOUD LOGIC: Auto-injector ---
@@ -955,7 +1064,7 @@
                 ? 'text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-rose-600'
                 : 'text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-emerald-600';
 
-            const projectedEom = state.bankBalance + delta;
+            const projectedEom = getBankBalanceForCurrentMonth() + delta;
             const projEl = document.getElementById('metric-projected');
             projEl.innerText = `$${projectedEom.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
             projEl.className = projectedEom < 0
@@ -1378,7 +1487,7 @@
                 version: 1,
                 exportedAt: new Date().toISOString(),
                 settings: {
-                    bankBalance: state.bankBalance,
+                    monthlyBalances: state.monthlyBalances,
                     initializedMonths: state.initializedMonths
                 },
                 templates: state.templates,
@@ -1448,8 +1557,10 @@
                 statusEl.textContent = 'Restoring backup...';
 
                 // Write settings
+                // Support importing old (bankBalance) or new (monthlyBalances) format
+                const importedBalances = backup.settings.monthlyBalances || (typeof backup.settings.bankBalance === 'number' ? { [getMonthKey(REAL_CURRENT_DATE.getFullYear(), REAL_CURRENT_DATE.getMonth())]: { amount: backup.settings.bankBalance, autoCarry: false } } : {});
                 await setDoc(doc(db, 'users', uid, 'settings', 'main'), {
-                    bankBalance: backup.settings.bankBalance || 0,
+                    monthlyBalances: importedBalances,
                     initializedMonths: backup.settings.initializedMonths || [],
                     hasAcceptedTerms: true
                 });
