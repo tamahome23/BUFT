@@ -474,12 +474,12 @@
 
     <!-- Settings Modal -->
     <div id="modal-settings" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[100] px-4 opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300">
-            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300 max-h-[85vh] flex flex-col">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
                 <h3 class="font-extrabold text-lg text-slate-800"><i class="ph-bold ph-gear-six mr-2 text-slate-500"></i>Settings</h3>
                 <button onclick="closeModal('settings')" class="text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-100 rounded-full p-1.5 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
             </div>
-            <div class="p-6 space-y-6">
+            <div class="p-6 space-y-6 overflow-y-auto flex-1">
                 <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
                     <h4 class="font-bold text-slate-800 mb-1 flex items-center"><i class="ph-bold ph-download-simple mr-2 text-brand-500"></i>Export Data</h4>
                     <p class="text-xs text-slate-500 mb-4">Download all your templates, transactions, and settings as a JSON backup file.</p>
@@ -699,8 +699,8 @@
                         }
                         state.initializedMonths = data.initializedMonths || [];
                         state.hasAcceptedTerms = data.hasAcceptedTerms || false;
-                        // Load Washu AI provider config
-                        loadWashuProviderFromSettings(data);
+                        // Load Washu AI provider config (try-catch to never block init)
+                        try { loadWashuProviderFromSettings(data); } catch(e) { console.error('Washu config load error:', e); }
                     }
                     dataLoaded.settings = true;
                     checkReadyToInit(safetyTimer);
@@ -1558,6 +1558,17 @@
             modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95');
             setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); }, 300);
         }
+
+        // Close topmost visible modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modals = ['washu', 'comment', 'transaction', 'template', 'settings'];
+                for (const type of modals) {
+                    const modal = document.getElementById(`modal-${type}`);
+                    if (modal && !modal.classList.contains('hidden')) { closeModal(type); break; }
+                }
+            }
+        });
 
         window.openTransactionModal = function() {
             document.getElementById('form-transaction').reset();
