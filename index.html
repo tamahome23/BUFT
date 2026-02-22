@@ -1631,18 +1631,19 @@
                     }
                 });
             } else {
-                // New template — create ledger entries for current month (fire-and-forget)
-                const year = state.currentDate.getFullYear();
-                const month = state.currentDate.getMonth();
-                getTemplateDatesForMonth(tpl, year, month).forEach(dateStr => {
-                    if (!state.transactions.some(t => t.templateId === id && t.date === dateStr)) {
-                        const txnId = `tplgen_${id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
-                        setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), {
-                            id: txnId, templateId: id, date: dateStr, name: tpl.name,
-                            amount: tpl.amount, type: tpl.type, category: tpl.category,
-                            status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: ''
-                        });
-                    }
+                // New template — create ledger entries for all initialized current/future months
+                state.initializedMonths.filter(mk => mk >= CURRENT_MONTH_KEY).forEach(mk => {
+                    const [y, m] = mk.split('-').map(Number);
+                    getTemplateDatesForMonth(tpl, y, m - 1).forEach(dateStr => {
+                        if (!state.transactions.some(t => t.templateId === id && t.date === dateStr)) {
+                            const txnId = `tplgen_${id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
+                            setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), {
+                                id: txnId, templateId: id, date: dateStr, name: tpl.name,
+                                amount: tpl.amount, type: tpl.type, category: tpl.category,
+                                status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: ''
+                            });
+                        }
+                    });
                 });
             }
 
