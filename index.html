@@ -821,22 +821,25 @@
             const entry = getMonthBalanceEntry(monthKey);
             if (!entry.autoCarry) return entry.amount;
 
-            // Auto-carry: previous month's starting balance + previous month's full delta (all txns, not just uncleared)
+            // Auto-carry = previous month's Projected EoM
+            // i.e. prev bank balance + prev non-cleared delta
+            // (cleared items are already reflected in the bank balance)
             const prevKey = getPrevMonthKey(monthKey);
             const prevStarting = resolveAutoCarryBalance(prevKey, visited);
 
-            // For the carry, we use ALL transactions (including cleared) since cleared means it already hit the bank
             const [year, month] = prevKey.split('-').map(Number);
             const prevTxns = state.transactions.filter(t => {
                 const d = new Date(t.date + 'T00:00:00');
                 return d.getFullYear() === year && (d.getMonth() + 1) === month;
             });
-            let prevFullDelta = 0;
+            let prevDelta = 0;
             prevTxns.forEach(t => {
-                prevFullDelta += t.type === 'deposit' ? t.amount : -t.amount;
+                if (t.status !== 'cleared') {
+                    prevDelta += t.type === 'deposit' ? t.amount : -t.amount;
+                }
             });
 
-            return prevStarting + prevFullDelta;
+            return prevStarting + prevDelta;
         }
 
         function getBankBalanceForCurrentMonth() {
