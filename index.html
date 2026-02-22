@@ -2081,11 +2081,15 @@ ${buildWashuContext()}`;
                 };
 
                 // Retry logic for 429 rate limits (up to 3 attempts with backoff)
+                // Don't retry on quota exhaustion — only on temporary per-minute rate limits
                 let response;
                 const maxRetries = 3;
                 for (let attempt = 1; attempt <= maxRetries; attempt++) {
                     response = await fetch(apiUrl, fetchOpts);
                     if (response.status !== 429 || attempt === maxRetries) break;
+                    // Peek at the error to see if it's quota exhaustion (don't retry those)
+                    const peekBody = await response.clone().text();
+                    if (peekBody.includes('exceeded') || peekBody.includes('quota') || peekBody.includes('billing')) break;
                     const waitSec = attempt * 3;
                     console.log(`Washu 429 rate-limited, retrying in ${waitSec}s (attempt ${attempt}/${maxRetries})`);
                     if (target) target.innerHTML = `<i class="ph-bold ph-spinner washu-spinner mr-1.5"></i>Rate-limited — retrying in ${waitSec}s...`;
@@ -2138,7 +2142,11 @@ ${buildWashuContext()}`;
                     errorMsg += 'Your API key seems invalid or unauthorized. Double-check it in Settings.';
                 } else if (err.message.includes('API error 429')) {
                     const detail429 = err.message.replace('API error 429: ', '');
-                    errorMsg += `Rate limit hit even after retrying. Google says: "${detail429.substring(0, 200)}"`;
+                    if (detail429.includes('exceeded') || detail429.includes('quota') || detail429.includes('billing')) {
+                        errorMsg += 'Your free-tier daily quota with Google is used up. It resets at midnight Pacific time. You can also add billing at ai.google.dev to remove limits.';
+                    } else {
+                        errorMsg += `Temporary rate limit — wait a minute and try again. Google says: "${detail429.substring(0, 200)}"`;
+                    }
                 } else {
                     errorMsg += err.message;
                 }
