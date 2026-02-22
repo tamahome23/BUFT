@@ -1860,7 +1860,7 @@ ${buildWashuContext()}`;
                     <i class="ph-fill ph-brain text-white text-sm"></i>
                 </div>
                 <div class="bg-slate-50 rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] border border-slate-100 washu-msg">
-                    <p class="text-sm text-slate-700 leading-relaxed washu-typing" id="washu-streaming-target"></p>
+                    <p class="text-sm text-slate-500 leading-relaxed italic" id="washu-streaming-target"><i class="ph-bold ph-spinner animate-spin mr-1.5"></i>Washu is thinking...</p>
                 </div>`;
             msgArea.appendChild(washuDiv);
             msgArea.scrollTop = msgArea.scrollHeight;
@@ -1918,7 +1918,7 @@ ${buildWashuContext()}`;
                 };
 
                 const response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${washuGeminiKey}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${washuGeminiKey}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1931,45 +1931,25 @@ ${buildWashuContext()}`;
                     throw new Error(`API error ${response.status}: ${errBody.substring(0, 200)}`);
                 }
 
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
+                const result = await response.json();
+                fullText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
-
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const jsonStr = line.slice(6).trim();
-                            if (!jsonStr || jsonStr === '[DONE]') continue;
-                            try {
-                                const parsed = JSON.parse(jsonStr);
-                                const chunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-                                if (chunk) {
-                                    fullText += chunk;
-                                    target.innerHTML = simpleMarkdown(fullText);
-                                    msgArea.scrollTop = msgArea.scrollHeight;
-                                }
-                            } catch(e) { /* skip malformed chunks */ }
-                        }
-                    }
+                if (!fullText) {
+                    const blockReason = result.candidates?.[0]?.finishReason;
+                    throw new Error(blockReason ? `Response blocked (${blockReason})` : 'Empty response from Gemini');
                 }
 
-                // Finalize
-                target.classList.remove('washu-typing');
+                // Finalize — reset styling and render response
+                target.className = 'text-sm text-slate-700 leading-relaxed';
                 target.innerHTML = simpleMarkdown(fullText);
+                msgArea.scrollTop = msgArea.scrollHeight;
 
                 // Save to conversation history
                 washuConversation.push({ role: 'model', parts: [{ text: fullText }] });
 
             } catch (err) {
                 console.error('Washu API error:', err);
-                target.classList.remove('washu-typing');
+                target.className = 'text-sm leading-relaxed';
 
                 let errorMsg = 'Hmm, even a genius hits a snag sometimes. ';
                 if (err.message.includes('API error 400')) {
