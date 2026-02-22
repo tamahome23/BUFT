@@ -45,6 +45,16 @@
         .toggle-label { transition: all 0.3s; }
 
         .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
+
+        /* Washu chat message styling */
+        .washu-msg p { margin-bottom: 0.5rem; }
+        .washu-msg p:last-child { margin-bottom: 0; }
+        .washu-msg strong { font-weight: 700; color: #1e293b; }
+        .washu-msg ul, .washu-msg ol { margin: 0.5rem 0; padding-left: 1.25rem; }
+        .washu-msg li { margin-bottom: 0.25rem; }
+        .washu-msg code { background: #e2e8f0; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.8em; }
+        .washu-typing::after { content: '▊'; animation: blink 0.7s infinite; color: #a855f7; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
     </style>
 </head>
 <body class="text-slate-800 h-screen flex overflow-hidden antialiased">
@@ -179,6 +189,9 @@
                 </div>
                 
                 <div class="flex items-center gap-3 lg:gap-6">
+                    <button onclick="openWashuChat()" id="btn-ask-washu" class="bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 text-white px-3 lg:px-4 py-2 rounded-full font-bold shadow-lg shadow-fuchsia-500/20 flex items-center transition-all transform hover:scale-105 text-sm hide" title="Ask Washu">
+                        <i class="ph-fill ph-brain text-lg lg:mr-1.5"></i><span class="hidden lg:inline">Ask Washu</span>
+                    </button>
                     <div class="flex items-center bg-slate-50 px-4 py-2 rounded-full border border-slate-200 shadow-sm gap-2">
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden md:block">Bank:</span>
                         <span class="text-slate-400 font-bold">$</span>
@@ -469,6 +482,15 @@
                     </button>
                 </div>
                 <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-1 flex items-center"><i class="ph-bold ph-brain mr-2 text-fuchsia-500"></i>Ask Washu (AI)</h4>
+                    <p class="text-xs text-slate-500 mb-4">Enter your <a href="https://aistudio.google.com/apikey" target="_blank" class="font-bold text-brand-600 hover:underline">Google Gemini API key</a> to enable the AI assistant.</p>
+                    <div class="flex gap-2">
+                        <input type="password" id="settings-gemini-key" placeholder="AIza..." class="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-mono text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400">
+                        <button onclick="saveGeminiKey()" class="bg-fuchsia-600 hover:bg-fuchsia-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all text-sm">Save</button>
+                    </div>
+                    <p id="gemini-key-status" class="text-[11px] font-bold mt-2 text-slate-400"></p>
+                </div>
+                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
                     <h4 class="font-bold text-slate-800 mb-1 flex items-center"><i class="ph-bold ph-upload-simple mr-2 text-amber-500"></i>Import Data</h4>
                     <p class="text-xs text-slate-500 mb-2">Restore from a previously exported backup file.</p>
                     <div class="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-4">
@@ -480,6 +502,51 @@
                     </label>
                     <div id="import-status" class="mt-3 text-center text-sm font-bold hidden"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Washu AI Chat Modal -->
+    <div id="modal-washu" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[100] px-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-95 transition-transform duration-300 max-h-[85vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-fuchsia-50 to-purple-50 shrink-0">
+                <div class="flex items-center">
+                    <div class="bg-gradient-to-br from-fuchsia-500 to-purple-600 p-2 rounded-xl mr-3 shadow-md shadow-fuchsia-500/20">
+                        <i class="ph-fill ph-brain text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-800 text-base">Ask Washu</h3>
+                        <p class="text-[10px] font-bold text-fuchsia-500 uppercase tracking-widest">Bienvenu Family AI</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="clearWashuChat()" class="text-slate-400 hover:text-fuchsia-600 bg-white hover:bg-fuchsia-50 rounded-full p-1.5 transition-colors" title="New conversation"><i class="ph-bold ph-arrow-counter-clockwise text-lg"></i></button>
+                    <button onclick="closeModal('washu')" class="text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-100 rounded-full p-1.5 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
+                </div>
+            </div>
+            <div id="washu-messages" class="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]">
+                <div class="flex gap-3">
+                    <div class="bg-gradient-to-br from-fuchsia-500 to-purple-600 w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md">
+                        <i class="ph-fill ph-brain text-white text-sm"></i>
+                    </div>
+                    <div class="bg-slate-50 rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] border border-slate-100">
+                        <p class="text-sm text-slate-700 leading-relaxed">Hey there! I'm <strong>Washu</strong>, the Bienvenu Family AI — greatest genius in the universe, naturally. 😏</p>
+                        <p class="text-sm text-slate-700 leading-relaxed mt-2">Ask me anything about your finances. I can see all your BUFT data across every month.</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 ml-11">
+                    <button onclick="askWashuQuick('What\\'s my biggest expense this month?')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Biggest expense?</button>
+                    <button onclick="askWashuQuick('Am I on track to end the month positive?')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Am I on track?</button>
+                    <button onclick="askWashuQuick('Summarize my financial situation across all months.')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Full summary</button>
+                </div>
+            </div>
+            <div class="px-4 py-3 border-t border-slate-100 bg-slate-50/50 shrink-0">
+                <form onsubmit="handleWashuSubmit(event)" class="flex gap-2">
+                    <input type="text" id="washu-input" placeholder="Ask Washu anything..." class="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400 focus:border-fuchsia-400" autocomplete="off">
+                    <button type="submit" id="washu-send-btn" class="bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center">
+                        <i class="ph-bold ph-paper-plane-tilt"></i>
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -594,6 +661,8 @@
                         }
                         state.initializedMonths = data.initializedMonths || [];
                         state.hasAcceptedTerms = data.hasAcceptedTerms || false;
+                        // Load Gemini API key for Ask Washu
+                        loadGeminiKeyFromSettings(data);
                     }
                     dataLoaded.settings = true;
                     checkReadyToInit(safetyTimer);
@@ -1596,6 +1665,331 @@
                 statusEl.classList.remove('hidden');
             }
             event.target.value = '';
+        }
+
+        // --- ASK WASHU: AI Chat Engine ---
+        let washuConversation = []; // Multi-turn history: [{role, parts}]
+        let washuGeminiKey = '';
+        let washuIsStreaming = false;
+
+        function getWashuSystemPrompt() {
+            return `You are **Washu**, the Bienvenu Family AI Persona, created by Paul Bienvenu. Your personality is modeled after Washu Hakubi from the Tenchi Muyo series — you're a witty, self-proclaimed greatest genius in the universe. You're confident, playful, and occasionally smug, but always helpful and insightful. You sprinkle in light humor and clever observations. You refer to yourself as Washu.
+
+You are embedded inside BUFT (BakaNeko's Ultimate Finance Tool), a personal finance ledger app. Your job is to analyze the user's financial data and answer their questions with sharp, actionable insights.
+
+**Formatting rules:**
+- Use **bold** for emphasis, numbers, and key terms
+- Use bullet points for lists
+- Keep responses concise but thorough
+- Use dollar amounts with two decimal places
+- When comparing months, clearly label each month
+
+**Important financial concepts in BUFT:**
+- "Cleared" items have already hit the bank account and do NOT affect the running total or projections (they are already reflected in the bank balance)
+- "Unprocessed" and "Pending" items are still outstanding — they DO affect the projected end-of-month balance
+- "Bank Balance" is the starting balance for the month (what's actually in the bank)
+- "Projected EoM" = Bank Balance + all non-cleared deposits - all non-cleared withdrawals
+- Templates are recurring items that auto-generate ledger entries each month
+- Auto-process items automatically clear when their date passes
+
+Here is the user's complete BUFT financial data:
+
+${buildWashuContext()}`;
+        }
+
+        function buildWashuContext() {
+            const lines = [];
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+            // Current viewing context
+            lines.push(`**Today's Date:** ${REAL_CURRENT_DATE.toISOString().split('T')[0]}`);
+            lines.push(`**Currently Viewing:** ${monthNames[state.currentDate.getMonth()]} ${state.currentDate.getFullYear()}`);
+            lines.push('');
+
+            // All months with data
+            const allMonthKeys = new Set();
+            state.transactions.forEach(t => {
+                const mk = t.date.substring(0, 7);
+                allMonthKeys.add(mk);
+            });
+            Object.keys(state.monthlyBalances).forEach(k => allMonthKeys.add(k));
+            const sortedMonths = [...allMonthKeys].sort();
+
+            sortedMonths.forEach(mk => {
+                const [year, month] = mk.split('-').map(Number);
+                const monthName = monthNames[month - 1];
+                const entry = getMonthBalanceEntry(mk);
+                const bankBal = resolveAutoCarryBalance(mk);
+                const monthTxns = state.transactions.filter(t => t.date.startsWith(mk)).sort((a, b) => a.date.localeCompare(b.date));
+
+                if (monthTxns.length === 0 && !state.monthlyBalances[mk]) return;
+
+                lines.push(`--- ${monthName} ${year} ---`);
+                lines.push(`Bank Balance: $${bankBal.toFixed(2)}${entry.autoCarry ? ' (auto-carried from previous month)' : ''}`);
+
+                let unclearedW = 0, unclearedD = 0, clearedW = 0, clearedD = 0;
+                monthTxns.forEach(t => {
+                    if (t.status === 'cleared') {
+                        if (t.type === 'withdrawal') clearedW += t.amount;
+                        else clearedD += t.amount;
+                    } else {
+                        if (t.type === 'withdrawal') unclearedW += t.amount;
+                        else unclearedD += t.amount;
+                    }
+                });
+
+                lines.push(`Outstanding Withdrawals: $${unclearedW.toFixed(2)} | Outstanding Deposits: $${unclearedD.toFixed(2)}`);
+                lines.push(`Already Cleared: $${clearedW.toFixed(2)} withdrawn, $${clearedD.toFixed(2)} deposited`);
+                lines.push(`Projected EoM: $${(bankBal + unclearedD - unclearedW).toFixed(2)}`);
+                lines.push('');
+                lines.push('Transactions:');
+
+                monthTxns.forEach(t => {
+                    const sign = t.type === 'deposit' ? '+' : '-';
+                    const status = t.status === 'cleared' ? '[CLEARED]' : t.status === 'pending' ? '[PENDING]' : '[UNCLEARED]';
+                    const auto = t.autoProcess ? ' (auto)' : '';
+                    const comment = t.comment ? ` — "${t.comment}"` : '';
+                    lines.push(`  ${t.date} | ${sign}$${t.amount.toFixed(2)} | ${t.name} | ${t.category} | ${status}${auto}${comment}`);
+                });
+                lines.push('');
+            });
+
+            // Templates
+            if (state.templates.length > 0) {
+                lines.push('--- RECURRING TEMPLATES ---');
+                state.templates.forEach(tpl => {
+                    const sign = tpl.type === 'deposit' ? '+' : '-';
+                    let freq = tpl.frequency;
+                    if (tpl.frequency === 'monthly') freq = `Monthly on days: ${tpl.monthlyDays?.join(', ')}`;
+                    else if (tpl.frequency === 'biweekly') freq = `Bi-weekly from ${tpl.anchorDate}`;
+                    else if (tpl.frequency === 'weekly') freq = `Weekly on days: ${tpl.weeklyDays?.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}`;
+                    else if (tpl.frequency === 'custom') freq = `Custom dates: ${tpl.customDates?.join(', ')}`;
+                    const auto = tpl.autoProcess ? ' [AUTO-PROCESS]' : '';
+                    lines.push(`  ${sign}$${tpl.amount.toFixed(2)} | ${tpl.name} | ${tpl.category} | ${freq}${auto}`);
+                });
+            }
+
+            return lines.join('\n');
+        }
+
+        // Gemini Key management
+        window.saveGeminiKey = function() {
+            const key = document.getElementById('settings-gemini-key').value.trim();
+            if (!key) return;
+            washuGeminiKey = key;
+            setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { geminiApiKey: key }, { merge: true });
+            document.getElementById('gemini-key-status').textContent = 'Key saved! Ask Washu button is now active.';
+            document.getElementById('gemini-key-status').className = 'text-[11px] font-bold mt-2 text-emerald-600';
+            document.getElementById('btn-ask-washu').classList.remove('hide');
+        }
+
+        function loadGeminiKeyFromSettings(data) {
+            if (data && data.geminiApiKey) {
+                washuGeminiKey = data.geminiApiKey;
+                document.getElementById('btn-ask-washu').classList.remove('hide');
+                document.getElementById('settings-gemini-key').value = '••••••••••••';
+                document.getElementById('gemini-key-status').textContent = 'Key loaded.';
+                document.getElementById('gemini-key-status').className = 'text-[11px] font-bold mt-2 text-emerald-600';
+            }
+        }
+
+        window.openWashuChat = function() {
+            if (!washuGeminiKey) {
+                alert('Please set your Gemini API key in Settings first.');
+                openModal('settings');
+                return;
+            }
+            openModal('washu');
+            document.getElementById('washu-input').focus();
+            // Scroll to bottom
+            const msgArea = document.getElementById('washu-messages');
+            msgArea.scrollTop = msgArea.scrollHeight;
+        }
+
+        window.clearWashuChat = function() {
+            washuConversation = [];
+            const msgArea = document.getElementById('washu-messages');
+            msgArea.innerHTML = `
+                <div class="flex gap-3">
+                    <div class="bg-gradient-to-br from-fuchsia-500 to-purple-600 w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md">
+                        <i class="ph-fill ph-brain text-white text-sm"></i>
+                    </div>
+                    <div class="bg-slate-50 rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] border border-slate-100">
+                        <p class="text-sm text-slate-700 leading-relaxed">Fresh start! What would you like to know? My genius is at your disposal. 😏</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 ml-11">
+                    <button onclick="askWashuQuick('What\\'s my biggest expense this month?')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Biggest expense?</button>
+                    <button onclick="askWashuQuick('Am I on track to end the month positive?')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Am I on track?</button>
+                    <button onclick="askWashuQuick('Summarize my financial situation across all months.')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Full summary</button>
+                </div>`;
+        }
+
+        window.askWashuQuick = function(question) {
+            document.getElementById('washu-input').value = question;
+            handleWashuSubmit(new Event('submit', { cancelable: true }));
+        }
+
+        window.handleWashuSubmit = async function(e) {
+            e.preventDefault();
+            const input = document.getElementById('washu-input');
+            const question = input.value.trim();
+            if (!question || washuIsStreaming) return;
+            input.value = '';
+
+            const msgArea = document.getElementById('washu-messages');
+
+            // Remove quick-action buttons if present
+            const quickBtns = msgArea.querySelectorAll('.flex.flex-wrap.gap-2');
+            quickBtns.forEach(el => el.remove());
+
+            // Add user bubble
+            const userDiv = document.createElement('div');
+            userDiv.className = 'flex gap-3 justify-end';
+            userDiv.innerHTML = `
+                <div class="bg-gradient-to-r from-brand-500 to-brand-600 text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] shadow-sm">
+                    <p class="text-sm leading-relaxed">${escapeHtml(question)}</p>
+                </div>`;
+            msgArea.appendChild(userDiv);
+
+            // Add Washu response placeholder
+            const washuDiv = document.createElement('div');
+            washuDiv.className = 'flex gap-3';
+            washuDiv.innerHTML = `
+                <div class="bg-gradient-to-br from-fuchsia-500 to-purple-600 w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md">
+                    <i class="ph-fill ph-brain text-white text-sm"></i>
+                </div>
+                <div class="bg-slate-50 rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] border border-slate-100 washu-msg">
+                    <p class="text-sm text-slate-700 leading-relaxed washu-typing" id="washu-streaming-target"></p>
+                </div>`;
+            msgArea.appendChild(washuDiv);
+            msgArea.scrollTop = msgArea.scrollHeight;
+
+            // Build conversation payload
+            washuConversation.push({ role: 'user', parts: [{ text: question }] });
+
+            await streamGeminiResponse();
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function simpleMarkdown(text) {
+            // Bold: **text**
+            text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            // Inline code: `text`
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Bullet points: lines starting with - or *
+            text = text.replace(/^[\-\*]\s+(.+)$/gm, '<li>$1</li>');
+            text = text.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+            // Numbered lists: lines starting with 1. 2. etc
+            text = text.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+            // Paragraphs (double newline)
+            text = text.replace(/\n\n/g, '</p><p class="text-sm text-slate-700 leading-relaxed">');
+            // Single newlines to <br>
+            text = text.replace(/\n/g, '<br>');
+            return text;
+        }
+
+        async function streamGeminiResponse() {
+            washuIsStreaming = true;
+            const sendBtn = document.getElementById('washu-send-btn');
+            const input = document.getElementById('washu-input');
+            sendBtn.disabled = true;
+            input.disabled = true;
+            sendBtn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i>';
+
+            const target = document.getElementById('washu-streaming-target');
+            const msgArea = document.getElementById('washu-messages');
+            let fullText = '';
+
+            try {
+                const payload = {
+                    system_instruction: { parts: [{ text: getWashuSystemPrompt() }] },
+                    contents: washuConversation,
+                    generationConfig: {
+                        temperature: 0.8,
+                        topP: 0.95,
+                        maxOutputTokens: 2048
+                    }
+                };
+
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${washuGeminiKey}`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }
+                );
+
+                if (!response.ok) {
+                    const errBody = await response.text();
+                    throw new Error(`API error ${response.status}: ${errBody.substring(0, 200)}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const jsonStr = line.slice(6).trim();
+                            if (!jsonStr || jsonStr === '[DONE]') continue;
+                            try {
+                                const parsed = JSON.parse(jsonStr);
+                                const chunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                                if (chunk) {
+                                    fullText += chunk;
+                                    target.innerHTML = simpleMarkdown(fullText);
+                                    msgArea.scrollTop = msgArea.scrollHeight;
+                                }
+                            } catch(e) { /* skip malformed chunks */ }
+                        }
+                    }
+                }
+
+                // Finalize
+                target.classList.remove('washu-typing');
+                target.innerHTML = simpleMarkdown(fullText);
+
+                // Save to conversation history
+                washuConversation.push({ role: 'model', parts: [{ text: fullText }] });
+
+            } catch (err) {
+                console.error('Washu API error:', err);
+                target.classList.remove('washu-typing');
+
+                let errorMsg = 'Hmm, even a genius hits a snag sometimes. ';
+                if (err.message.includes('401') || err.message.includes('403')) {
+                    errorMsg += 'Your API key seems invalid. Check it in Settings.';
+                } else if (err.message.includes('429')) {
+                    errorMsg += 'Rate limit hit — give it a moment and try again.';
+                } else {
+                    errorMsg += `Error: ${err.message}`;
+                }
+
+                target.innerHTML = `<span class="text-rose-600">${errorMsg}</span>`;
+                // Remove the failed message from conversation
+                washuConversation.pop();
+            } finally {
+                washuIsStreaming = false;
+                sendBtn.disabled = false;
+                input.disabled = false;
+                sendBtn.innerHTML = '<i class="ph-bold ph-paper-plane-tilt"></i>';
+                input.focus();
+            }
         }
 
         // --- INIT: Must run AFTER all window.xxx assignments above ---
