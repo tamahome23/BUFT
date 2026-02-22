@@ -1945,9 +1945,9 @@ ${buildWashuContext()}`;
                     }
                 };
 
-                // AbortController with 30-second timeout to prevent hanging
+                // AbortController with 60-second timeout that covers the ENTIRE request lifecycle
                 const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 30000);
+                const timeout = setTimeout(() => controller.abort(), 60000);
                 startWashuTimer('Sent');
                 const payloadJson = JSON.stringify(payload);
                 console.log('Washu payload size:', payloadJson.length, 'chars');
@@ -1957,19 +1957,20 @@ ${buildWashuContext()}`;
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
+                        body: payloadJson,
                         signal: controller.signal
                     }
                 );
-                clearTimeout(timeout);
 
                 if (!response.ok) {
+                    clearTimeout(timeout);
                     const errBody = await response.text();
                     console.error('Washu API raw error:', response.status, errBody);
                     throw new Error(`API error ${response.status}: ${errBody.substring(0, 500)}`);
                 }
 
                 const result = await response.json();
+                clearTimeout(timeout);
                 fullText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
                 if (!fullText) {
@@ -1993,7 +1994,7 @@ ${buildWashuContext()}`;
 
                 let errorMsg = 'Hmm, even a genius hits a snag sometimes. ';
                 if (err.name === 'AbortError') {
-                    errorMsg += 'Request timed out after 30 seconds. The API might be overloaded — try again in a moment.';
+                    errorMsg += 'Request timed out after 60 seconds. The API might be overloaded — try again in a moment.';
                 } else if (err.message.includes('API error 400')) {
                     const detail = err.message.replace('API error 400: ', '').substring(0, 300);
                     errorMsg += `Bad request — ${detail}`;
