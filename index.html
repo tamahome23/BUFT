@@ -489,12 +489,43 @@
                 </div>
                 <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
                     <h4 class="font-bold text-slate-800 mb-1 flex items-center"><i class="ph-bold ph-brain mr-2 text-fuchsia-500"></i>Ask Washu (AI)</h4>
-                    <p class="text-xs text-slate-500 mb-4">Enter your <a href="https://aistudio.google.com/apikey" target="_blank" class="font-bold text-brand-600 hover:underline">Google Gemini API key</a> to enable the AI assistant.</p>
-                    <div class="flex gap-2">
-                        <input type="password" id="settings-gemini-key" placeholder="AIza..." class="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-mono text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400">
-                        <button onclick="saveGeminiKey()" class="bg-fuchsia-600 hover:bg-fuchsia-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all text-sm">Save</button>
+                    <p class="text-xs text-slate-500 mb-4">Connect an AI provider to enable the Washu assistant.</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Provider</label>
+                            <select id="settings-washu-provider" onchange="onWashuProviderChange()" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400 bg-white">
+                                <option value="gemini">Google Gemini</option>
+                                <option value="openai-compatible">OpenAI-Compatible (Ollama, LM Studio, etc.)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Endpoint URL</label>
+                            <input type="text" id="settings-washu-endpoint" placeholder="https://generativelanguage.googleapis.com/v1beta" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-mono text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400">
+                            <p id="washu-endpoint-hint" class="text-[10px] text-slate-400 mt-1">Default endpoint is pre-filled. Edit only if needed.</p>
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Model</label>
+                            <input type="text" id="settings-washu-model" placeholder="gemini-2.0-flash" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-mono text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center">
+                                API Key
+                                <span id="washu-key-required" class="ml-1.5 text-rose-400">(required)</span>
+                            </label>
+                            <input type="password" id="settings-washu-key" placeholder="AIza..." class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-mono text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400">
+                            <p id="washu-key-hint" class="text-[10px] text-slate-400 mt-1">Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" class="font-bold text-brand-600 hover:underline">aistudio.google.com</a></p>
+                        </div>
+                        <div id="washu-mixed-content-warning" class="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 hidden">
+                            <p class="text-[11px] font-bold text-amber-700 flex items-center"><i class="ph-fill ph-warning mr-1.5"></i>Your browser may block http:// requests from this https:// page. Use HTTPS for the endpoint or access BUFT over HTTP.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="testWashuConnection()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2.5 rounded-xl font-bold transition-all text-sm flex items-center justify-center">
+                                <i class="ph-bold ph-plugs-connected mr-1.5"></i> Test
+                            </button>
+                            <button onclick="saveWashuProvider()" class="flex-1 bg-fuchsia-600 hover:bg-fuchsia-700 text-white py-2.5 rounded-xl font-bold shadow-md transition-all text-sm">Save</button>
+                        </div>
                     </div>
-                    <p id="gemini-key-status" class="text-[11px] font-bold mt-2 text-slate-400"></p>
+                    <p id="washu-provider-status" class="text-[11px] font-bold mt-2 text-slate-400"></p>
                 </div>
                 <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
                     <h4 class="font-bold text-slate-800 mb-1 flex items-center"><i class="ph-bold ph-upload-simple mr-2 text-amber-500"></i>Import Data</h4>
@@ -668,8 +699,8 @@
                         }
                         state.initializedMonths = data.initializedMonths || [];
                         state.hasAcceptedTerms = data.hasAcceptedTerms || false;
-                        // Load Gemini API key for Ask Washu
-                        loadGeminiKeyFromSettings(data);
+                        // Load Washu AI provider config
+                        loadWashuProviderFromSettings(data);
                     }
                     dataLoaded.settings = true;
                     checkReadyToInit(safetyTimer);
@@ -1774,14 +1805,20 @@
             event.target.value = '';
         }
 
-        // --- ASK WASHU: AI Chat Engine ---
-        let washuConversation = []; // Multi-turn history: [{role, parts}]
-        let washuGeminiKey = '';
+        // --- ASK WASHU: AI Chat Engine (Multi-Provider) ---
+        let washuConversation = []; // Multi-turn history: [{role: 'user'|'assistant', content: '...'}]
         let washuIsStreaming = false;
         let washuAbortController = null;
         let washuLastApiTime = null;
         let washuTimerInterval = null;
         let washuLastApiLabel = '';
+
+        // Provider config
+        const WASHU_PROVIDER_DEFAULTS = {
+            'gemini': { endpoint: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-2.0-flash', keyRequired: true, keyHint: 'Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" class="font-bold text-brand-600 hover:underline">aistudio.google.com</a>' },
+            'openai-compatible': { endpoint: 'http://localhost:11434', model: 'llama3', keyRequired: false, keyHint: 'Optional — only needed for cloud providers like OpenRouter.' }
+        };
+        let washuConfig = { provider: '', endpoint: '', model: '', apiKey: '' };
 
         function startWashuTimer(label) {
             washuLastApiTime = Date.now();
@@ -1905,30 +1942,190 @@ ${buildWashuContext()}`;
             return lines.join('\n');
         }
 
-        // Gemini Key management
-        window.saveGeminiKey = function() {
-            const key = document.getElementById('settings-gemini-key').value.trim();
-            if (!key) return;
-            washuGeminiKey = key;
-            setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { geminiApiKey: key }, { merge: true });
-            document.getElementById('gemini-key-status').textContent = 'Key saved! Ask Washu button is now active.';
-            document.getElementById('gemini-key-status').className = 'text-[11px] font-bold mt-2 text-emerald-600';
+        // --- Washu Provider UI helpers ---
+        window.onWashuProviderChange = function() {
+            const provider = document.getElementById('settings-washu-provider').value;
+            const defaults = WASHU_PROVIDER_DEFAULTS[provider];
+            document.getElementById('settings-washu-endpoint').value = defaults.endpoint;
+            document.getElementById('settings-washu-endpoint').placeholder = defaults.endpoint;
+            document.getElementById('settings-washu-model').value = defaults.model;
+            document.getElementById('settings-washu-model').placeholder = defaults.model;
+            document.getElementById('washu-key-required').textContent = defaults.keyRequired ? '(required)' : '(optional)';
+            document.getElementById('washu-key-required').className = defaults.keyRequired ? 'ml-1.5 text-rose-400' : 'ml-1.5 text-slate-400';
+            document.getElementById('washu-key-hint').innerHTML = defaults.keyHint;
+            document.getElementById('settings-washu-key').value = '';
+            document.getElementById('settings-washu-key').placeholder = defaults.keyRequired ? 'AIza...' : 'sk-... (optional)';
+            // Mixed-content warning
+            checkWashuMixedContent();
+        }
+
+        function checkWashuMixedContent() {
+            const endpoint = document.getElementById('settings-washu-endpoint').value.trim();
+            const warn = document.getElementById('washu-mixed-content-warning');
+            if (window.location.protocol === 'https:' && endpoint.startsWith('http://')) {
+                warn.classList.remove('hidden');
+            } else {
+                warn.classList.add('hidden');
+            }
+        }
+
+        // --- Washu Provider save/load ---
+        window.saveWashuProvider = function() {
+            const provider = document.getElementById('settings-washu-provider').value;
+            const endpoint = document.getElementById('settings-washu-endpoint').value.trim() || WASHU_PROVIDER_DEFAULTS[provider].endpoint;
+            const model = document.getElementById('settings-washu-model').value.trim() || WASHU_PROVIDER_DEFAULTS[provider].model;
+            const apiKey = document.getElementById('settings-washu-key').value.trim();
+            const defaults = WASHU_PROVIDER_DEFAULTS[provider];
+            const statusEl = document.getElementById('washu-provider-status');
+
+            // Validate: key required for Gemini
+            if (defaults.keyRequired && !apiKey && !washuConfig.apiKey) {
+                statusEl.textContent = 'API key is required for this provider.';
+                statusEl.className = 'text-[11px] font-bold mt-2 text-rose-600';
+                return;
+            }
+
+            washuConfig.provider = provider;
+            washuConfig.endpoint = endpoint;
+            washuConfig.model = model;
+            if (apiKey) washuConfig.apiKey = apiKey; // don't overwrite existing key if field is masked
+
+            setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), {
+                washuProvider: provider,
+                washuEndpoint: endpoint,
+                washuModel: model,
+                washuApiKey: washuConfig.apiKey
+            }, { merge: true });
+
+            statusEl.textContent = 'Saved! Ask Washu is ready.';
+            statusEl.className = 'text-[11px] font-bold mt-2 text-emerald-600';
             document.getElementById('btn-ask-washu').classList.remove('hide');
         }
 
-        function loadGeminiKeyFromSettings(data) {
-            if (data && data.geminiApiKey) {
-                washuGeminiKey = data.geminiApiKey;
-                document.getElementById('btn-ask-washu').classList.remove('hide');
-                document.getElementById('settings-gemini-key').value = '••••••••••••';
-                document.getElementById('gemini-key-status').textContent = 'Key loaded.';
-                document.getElementById('gemini-key-status').className = 'text-[11px] font-bold mt-2 text-emerald-600';
+        function loadWashuProviderFromSettings(data) {
+            if (!data) return;
+            // Backward compat: migrate old geminiApiKey-only config
+            if (data.geminiApiKey && !data.washuProvider) {
+                washuConfig.provider = 'gemini';
+                washuConfig.endpoint = WASHU_PROVIDER_DEFAULTS['gemini'].endpoint;
+                washuConfig.model = WASHU_PROVIDER_DEFAULTS['gemini'].model;
+                washuConfig.apiKey = data.geminiApiKey;
+            } else if (data.washuProvider) {
+                washuConfig.provider = data.washuProvider;
+                washuConfig.endpoint = data.washuEndpoint || WASHU_PROVIDER_DEFAULTS[data.washuProvider]?.endpoint || '';
+                washuConfig.model = data.washuModel || WASHU_PROVIDER_DEFAULTS[data.washuProvider]?.model || '';
+                washuConfig.apiKey = data.washuApiKey || '';
+            } else {
+                return; // No AI config at all
+            }
+
+            // Populate UI fields
+            document.getElementById('settings-washu-provider').value = washuConfig.provider;
+            document.getElementById('settings-washu-endpoint').value = washuConfig.endpoint;
+            document.getElementById('settings-washu-model').value = washuConfig.model;
+            if (washuConfig.apiKey) {
+                document.getElementById('settings-washu-key').value = '••••••••••••';
+            }
+            const defaults = WASHU_PROVIDER_DEFAULTS[washuConfig.provider];
+            if (defaults) {
+                document.getElementById('washu-key-required').textContent = defaults.keyRequired ? '(required)' : '(optional)';
+                document.getElementById('washu-key-required').className = defaults.keyRequired ? 'ml-1.5 text-rose-400' : 'ml-1.5 text-slate-400';
+                document.getElementById('washu-key-hint').innerHTML = defaults.keyHint;
+                document.getElementById('settings-washu-key').placeholder = defaults.keyRequired ? 'AIza...' : 'sk-... (optional)';
+            }
+
+            document.getElementById('btn-ask-washu').classList.remove('hide');
+            const statusEl = document.getElementById('washu-provider-status');
+            statusEl.textContent = `${washuConfig.provider === 'gemini' ? 'Gemini' : 'OpenAI-compatible'} provider loaded.`;
+            statusEl.className = 'text-[11px] font-bold mt-2 text-emerald-600';
+        }
+
+        // --- Test Connection ---
+        window.testWashuConnection = async function() {
+            const provider = document.getElementById('settings-washu-provider').value;
+            const endpoint = document.getElementById('settings-washu-endpoint').value.trim() || WASHU_PROVIDER_DEFAULTS[provider].endpoint;
+            const model = document.getElementById('settings-washu-model').value.trim() || WASHU_PROVIDER_DEFAULTS[provider].model;
+            let apiKey = document.getElementById('settings-washu-key').value.trim();
+            if (apiKey === '••••••••••••') apiKey = washuConfig.apiKey; // use saved key if field is masked
+            const statusEl = document.getElementById('washu-provider-status');
+            statusEl.textContent = 'Testing connection...';
+            statusEl.className = 'text-[11px] font-bold mt-2 text-slate-500';
+
+            try {
+                const req = buildProviderRequest(provider, endpoint, model, apiKey, 'Reply with just the word OK.', [{ role: 'user', content: 'Say OK' }]);
+                const resp = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body), signal: AbortSignal.timeout(15000) });
+                if (!resp.ok) {
+                    const errText = await resp.text();
+                    let msg = '';
+                    try { msg = JSON.parse(errText)?.error?.message || ''; } catch(_) {}
+                    throw new Error(`HTTP ${resp.status}: ${msg || errText.substring(0, 200)}`);
+                }
+                const result = await resp.json();
+                const text = parseProviderResponse(provider, result);
+                if (!text) throw new Error('Empty response — check model name.');
+                statusEl.textContent = `Connected! Model responded: "${text.substring(0, 60)}"`;
+                statusEl.className = 'text-[11px] font-bold mt-2 text-emerald-600';
+            } catch (err) {
+                statusEl.textContent = `Connection failed: ${err.message}`;
+                statusEl.className = 'text-[11px] font-bold mt-2 text-rose-600';
+            }
+        }
+
+        // --- Provider Translation Layer ---
+        function buildProviderRequest(provider, endpoint, model, apiKey, systemPrompt, conversation) {
+            if (provider === 'gemini') {
+                // Gemini format
+                const geminiContents = conversation.map(m => ({
+                    role: m.role === 'assistant' ? 'model' : m.role,
+                    parts: [{ text: m.content }]
+                }));
+                return {
+                    url: `${endpoint}/models/${model}:generateContent?key=${apiKey}`,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: {
+                        system_instruction: { parts: [{ text: systemPrompt }] },
+                        contents: geminiContents,
+                        generationConfig: { temperature: 0.8, topP: 0.95, maxOutputTokens: 2048 }
+                    }
+                };
+            } else {
+                // OpenAI-compatible format (Ollama, LM Studio, OpenRouter, etc.)
+                const messages = [
+                    { role: 'system', content: systemPrompt },
+                    ...conversation.map(m => ({ role: m.role, content: m.content }))
+                ];
+                const headers = { 'Content-Type': 'application/json' };
+                if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+                // Normalize endpoint: strip trailing slash, add /v1/chat/completions if not present
+                let url = endpoint.replace(/\/+$/, '');
+                if (!url.includes('/v1/chat/completions')) url += '/v1/chat/completions';
+                return {
+                    url,
+                    headers,
+                    body: { model, messages, temperature: 0.8, max_tokens: 2048 }
+                };
+            }
+        }
+
+        function parseProviderResponse(provider, result) {
+            if (provider === 'gemini') {
+                return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            } else {
+                return result.choices?.[0]?.message?.content || '';
+            }
+        }
+
+        function getProviderBlockReason(provider, result) {
+            if (provider === 'gemini') {
+                return result.candidates?.[0]?.finishReason || '';
+            } else {
+                return result.choices?.[0]?.finish_reason || '';
             }
         }
 
         window.openWashuChat = function() {
-            if (!washuGeminiKey) {
-                alert('Please set your Gemini API key in Settings first.');
+            if (!washuConfig.provider) {
+                alert('Please configure an AI provider in Settings first.');
                 openModal('settings');
                 return;
             }
@@ -2006,10 +2203,10 @@ ${buildWashuContext()}`;
             msgArea.appendChild(washuDiv);
             msgArea.scrollTop = msgArea.scrollHeight;
 
-            // Build conversation payload
-            washuConversation.push({ role: 'user', parts: [{ text: question }] });
+            // Build conversation payload (neutral format)
+            washuConversation.push({ role: 'user', content: question });
 
-            await streamGeminiResponse();
+            await sendWashuRequest();
         }
 
         function escapeHtml(str) {
@@ -2035,7 +2232,7 @@ ${buildWashuContext()}`;
             return text;
         }
 
-        async function streamGeminiResponse() {
+        async function sendWashuRequest() {
             washuIsStreaming = true;
             const sendBtn = document.getElementById('washu-send-btn');
             const input = document.getElementById('washu-input');
@@ -2049,33 +2246,26 @@ ${buildWashuContext()}`;
             let payloadJson = '';
             let systemPromptLen = 0;
             let convoLen = 0;
+            const { provider, endpoint, model, apiKey } = washuConfig;
 
             try {
-                const payload = {
-                    system_instruction: { parts: [{ text: getWashuSystemPrompt() }] },
-                    contents: washuConversation,
-                    generationConfig: {
-                        temperature: 0.8,
-                        topP: 0.95,
-                        maxOutputTokens: 2048
-                    }
-                };
+                const systemPrompt = getWashuSystemPrompt();
+                const req = buildProviderRequest(provider, endpoint, model, apiKey, systemPrompt, washuConversation);
 
                 // AbortController with 60-second timeout that covers the ENTIRE request lifecycle
                 const controller = new AbortController();
                 washuAbortController = controller;
                 const timeout = setTimeout(() => controller.abort(), 60000);
                 startWashuTimer('Sent');
-                payloadJson = JSON.stringify(payload);
-                systemPromptLen = getWashuSystemPrompt().length;
+                payloadJson = JSON.stringify(req.body);
+                systemPromptLen = systemPrompt.length;
                 convoLen = JSON.stringify(washuConversation).length;
                 const approxTokens = Math.ceil(payloadJson.length / 4);
-                console.log(`Washu payload: ${payloadJson.length} chars (~${approxTokens} tokens), system prompt: ${systemPromptLen} chars, conversation: ${convoLen} chars`);
+                console.log(`Washu [${provider}] payload: ${payloadJson.length} chars (~${approxTokens} tokens), system prompt: ${systemPromptLen} chars, conversation: ${convoLen} chars`);
 
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${washuGeminiKey}`;
                 const fetchOpts = {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: req.headers,
                     body: payloadJson,
                     signal: controller.signal
                 };
@@ -2085,7 +2275,7 @@ ${buildWashuContext()}`;
                 let response;
                 const maxRetries = 3;
                 for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                    response = await fetch(apiUrl, fetchOpts);
+                    response = await fetch(req.url, fetchOpts);
                     if (response.status !== 429 || attempt === maxRetries) break;
                     // Peek at the error to see if it's quota exhaustion (don't retry those)
                     const peekBody = await response.clone().text();
@@ -2100,22 +2290,21 @@ ${buildWashuContext()}`;
                     clearTimeout(timeout);
                     const errBody = await response.text();
                     console.error('Washu API raw error:', response.status, errBody);
-                    // Try to extract the specific error message from Google's JSON response
-                    let googleMsg = '';
+                    let apiMsg = '';
                     try {
                         const errJson = JSON.parse(errBody);
-                        googleMsg = errJson?.error?.message || '';
+                        apiMsg = errJson?.error?.message || '';
                     } catch(_) {}
-                    throw new Error(`API error ${response.status}: ${googleMsg || errBody.substring(0, 500)}`);
+                    throw new Error(`API error ${response.status}: ${apiMsg || errBody.substring(0, 500)}`);
                 }
 
                 const result = await response.json();
                 clearTimeout(timeout);
-                fullText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                fullText = parseProviderResponse(provider, result);
 
                 if (!fullText) {
-                    const blockReason = result.candidates?.[0]?.finishReason;
-                    throw new Error(blockReason ? `Response blocked (${blockReason})` : 'Empty response from Gemini');
+                    const blockReason = getProviderBlockReason(provider, result);
+                    throw new Error(blockReason ? `Response blocked (${blockReason})` : 'Empty response from AI provider');
                 }
 
                 // Finalize — reset styling and render response
@@ -2124,8 +2313,8 @@ ${buildWashuContext()}`;
                 target.innerHTML = simpleMarkdown(fullText);
                 msgArea.scrollTop = msgArea.scrollHeight;
 
-                // Save to conversation history
-                washuConversation.push({ role: 'model', parts: [{ text: fullText }] });
+                // Save to conversation history (neutral format)
+                washuConversation.push({ role: 'assistant', content: fullText });
 
             } catch (err) {
                 console.error('Washu API error:', err);
@@ -2145,15 +2334,17 @@ ${buildWashuContext()}`;
                     if (detail429.includes('exceeded') || detail429.includes('quota') || detail429.includes('billing')) {
                         errorMsg += 'Your free-tier daily quota with Google is used up. It resets at midnight Pacific time. You can also add billing at ai.google.dev to remove limits.';
                     } else {
-                        errorMsg += `Temporary rate limit — wait a minute and try again. Google says: "${detail429.substring(0, 200)}"`;
+                        errorMsg += `Temporary rate limit — wait a minute and try again. Provider says: "${detail429.substring(0, 200)}"`;
                     }
+                } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+                    errorMsg += `Could not reach the AI endpoint (${endpoint}). Check that the URL is correct and the service is running.`;
                 } else {
                     errorMsg += err.message;
                 }
 
                 // Show diagnostics so we can debug persistent failures
                 const diagLine = payloadJson
-                    ? `<br><span class="text-xs text-slate-500 mt-2 block font-mono">📊 payload: ${payloadJson.length} chars (~${Math.ceil(payloadJson.length / 4)} tokens) | prompt: ${systemPromptLen} chars | convo: ${convoLen} chars</span>`
+                    ? `<br><span class="text-xs text-slate-500 mt-2 block font-mono">provider: ${provider} | model: ${model} | payload: ${payloadJson.length} chars (~${Math.ceil(payloadJson.length / 4)} tokens) | prompt: ${systemPromptLen} chars | convo: ${convoLen} chars</span>`
                     : '';
 
                 target.innerHTML = `<span class="text-rose-600">${errorMsg}</span>${diagLine}`;
