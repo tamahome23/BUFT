@@ -2153,7 +2153,7 @@ ${buildWashuContext()}`;
 
                 // Show diagnostics so we can debug persistent failures
                 const diagLine = payloadJson
-                    ? `<br><span class="text-[10px] text-slate-400 mt-1 block">payload: ${payloadJson.length} chars (~${Math.ceil(payloadJson.length / 4)} tokens) · system prompt: ${systemPromptLen} chars · conversation: ${convoLen} chars</span>`
+                    ? `<br><span class="text-xs text-slate-500 mt-2 block font-mono">📊 payload: ${payloadJson.length} chars (~${Math.ceil(payloadJson.length / 4)} tokens) | prompt: ${systemPromptLen} chars | convo: ${convoLen} chars</span>`
                     : '';
 
                 target.innerHTML = `<span class="text-rose-600">${errorMsg}</span>${diagLine}`;
