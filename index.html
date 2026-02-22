@@ -2046,6 +2046,9 @@ ${buildWashuContext()}`;
             const target = document.getElementById('washu-streaming-target');
             const msgArea = document.getElementById('washu-messages');
             let fullText = '';
+            let payloadJson = '';
+            let systemPromptLen = 0;
+            let convoLen = 0;
 
             try {
                 const payload = {
@@ -2063,9 +2066,9 @@ ${buildWashuContext()}`;
                 washuAbortController = controller;
                 const timeout = setTimeout(() => controller.abort(), 60000);
                 startWashuTimer('Sent');
-                const payloadJson = JSON.stringify(payload);
-                const systemPromptLen = getWashuSystemPrompt().length;
-                const convoLen = JSON.stringify(washuConversation).length;
+                payloadJson = JSON.stringify(payload);
+                systemPromptLen = getWashuSystemPrompt().length;
+                convoLen = JSON.stringify(washuConversation).length;
                 const approxTokens = Math.ceil(payloadJson.length / 4);
                 console.log(`Washu payload: ${payloadJson.length} chars (~${approxTokens} tokens), system prompt: ${systemPromptLen} chars, conversation: ${convoLen} chars`);
 
@@ -2141,11 +2144,9 @@ ${buildWashuContext()}`;
                 }
 
                 // Show diagnostics so we can debug persistent failures
-                const diagParts = [];
-                if (typeof payloadJson !== 'undefined') diagParts.push(`payload: ${payloadJson.length} chars (~${Math.ceil(payloadJson.length / 4)} tokens)`);
-                if (typeof systemPromptLen !== 'undefined') diagParts.push(`system prompt: ${systemPromptLen} chars`);
-                if (typeof convoLen !== 'undefined') diagParts.push(`conversation: ${convoLen} chars`);
-                const diagLine = diagParts.length ? `<br><span class="text-[10px] text-slate-400 mt-1 block">${diagParts.join(' · ')}</span>` : '';
+                const diagLine = payloadJson
+                    ? `<br><span class="text-[10px] text-slate-400 mt-1 block">payload: ${payloadJson.length} chars (~${Math.ceil(payloadJson.length / 4)} tokens) · system prompt: ${systemPromptLen} chars · conversation: ${convoLen} chars</span>`
+                    : '';
 
                 target.innerHTML = `<span class="text-rose-600">${errorMsg}</span>${diagLine}`;
                 // Remove the failed message from conversation
