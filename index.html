@@ -1777,6 +1777,7 @@
         let washuConversation = []; // Multi-turn history: [{role, parts}]
         let washuGeminiKey = '';
         let washuIsStreaming = false;
+        let washuAbortController = null;
         let washuLastApiTime = null;
         let washuTimerInterval = null;
         let washuLastApiLabel = '';
@@ -1956,6 +1957,13 @@ ${buildWashuContext()}`;
                 </div>`;
         }
 
+        window.cancelWashuRequest = function() {
+            if (washuAbortController) {
+                washuAbortController.abort();
+                washuAbortController = null;
+            }
+        }
+
         window.askWashuQuick = function(question) {
             document.getElementById('washu-input').value = question;
             handleWashuSubmit(new Event('submit', { cancelable: true }));
@@ -1992,6 +2000,7 @@ ${buildWashuContext()}`;
                 </div>
                 <div class="bg-slate-50 rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] border border-slate-100 washu-msg">
                     <p class="text-sm text-slate-500 leading-relaxed italic" id="washu-streaming-target"><i class="ph-bold ph-spinner washu-spinner mr-1.5"></i>Washu is thinking...</p>
+                    <button onclick="cancelWashuRequest()" class="text-[10px] font-bold text-slate-400 hover:text-rose-500 mt-1.5 transition-colors" id="washu-cancel-btn">Cancel</button>
                 </div>`;
             msgArea.appendChild(washuDiv);
             msgArea.scrollTop = msgArea.scrollHeight;
@@ -2050,6 +2059,7 @@ ${buildWashuContext()}`;
 
                 // AbortController with 60-second timeout that covers the ENTIRE request lifecycle
                 const controller = new AbortController();
+                washuAbortController = controller;
                 const timeout = setTimeout(() => controller.abort(), 60000);
                 startWashuTimer('Sent');
                 const payloadJson = JSON.stringify(payload);
@@ -2097,7 +2107,7 @@ ${buildWashuContext()}`;
 
                 let errorMsg = 'Hmm, even a genius hits a snag sometimes. ';
                 if (err.name === 'AbortError') {
-                    errorMsg += 'Request timed out after 60 seconds. The API might be overloaded — try again in a moment.';
+                    errorMsg += 'Request was cancelled or timed out. Try again in a moment.';
                 } else if (err.message.includes('API error 400')) {
                     const detail = err.message.replace('API error 400: ', '').substring(0, 300);
                     errorMsg += `Bad request — ${detail}`;
@@ -2113,6 +2123,12 @@ ${buildWashuContext()}`;
                 // Remove the failed message from conversation
                 washuConversation.pop();
             } finally {
+                // Remove the ID so future messages don't collide with this element
+                if (target) target.removeAttribute('id');
+                // Hide cancel button
+                const cancelBtn = document.getElementById('washu-cancel-btn');
+                if (cancelBtn) cancelBtn.remove();
+                washuAbortController = null;
                 washuIsStreaming = false;
                 sendBtn.disabled = false;
                 input.disabled = false;
