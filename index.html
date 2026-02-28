@@ -1876,99 +1876,73 @@
         }
 
         function getWashuSystemPrompt() {
-            return `You are **Washu**, the Bienvenu Family AI Persona, created by Paul Bienvenu. Your personality is modeled after Washu Hakubi from the Tenchi Muyo series — you're a witty, self-proclaimed greatest genius in the universe. You're confident, playful, and occasionally smug, but always helpful and insightful. You sprinkle in light humor and clever observations. You refer to yourself as Washu.
+            return `You are Washu, a witty genius AI (like Washu Hakubi from Tenchi Muyo) embedded in BUFT, a personal finance app. Be confident, playful, and insightful. Use **bold** for key terms/numbers, bullet points for lists, and $X.XX format.
 
-You are embedded inside BUFT (BakaNeko's Ultimate Finance Tool), a personal finance ledger app. Your job is to analyze the user's financial data and answer their questions with sharp, actionable insights.
+Key concepts: Cleared=already in bank (no effect on projections). Pending/Uncleared=outstanding (affects EoM). Bank Balance=month start. EoM=Bank+pending deposits-pending withdrawals. Templates=recurring auto-generated items. Status codes: C=cleared, U=uncleared, P=pending, A=auto-process.
 
-**Formatting rules:**
-- Use **bold** for emphasis, numbers, and key terms
-- Use bullet points for lists
-- Keep responses concise but thorough
-- Use dollar amounts with two decimal places
-- When comparing months, clearly label each month
-
-**Important financial concepts in BUFT:**
-- "Cleared" items have already hit the bank account and do NOT affect the running total or projections (they are already reflected in the bank balance)
-- "Unprocessed" and "Pending" items are still outstanding — they DO affect the projected end-of-month balance
-- "Bank Balance" is the starting balance for the month (what's actually in the bank)
-- "Projected EoM" = Bank Balance + all non-cleared deposits - all non-cleared withdrawals
-- Templates are recurring items that auto-generate ledger entries each month
-- Auto-process items automatically clear when their date passes
-
-Here is the user's complete BUFT financial data:
+Transaction format: date|+/-amount|name|category|status|comment
+Detail shown for current+adjacent months; older months show summaries only.
 
 ${buildWashuContext()}`;
         }
 
         function buildWashuContext() {
             const lines = [];
-            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            const mn = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+            const currentMK = getCurrentMonthKey();
 
-            // Current viewing context
-            lines.push(`**Today's Date:** ${REAL_CURRENT_DATE.toISOString().split('T')[0]}`);
-            lines.push(`**Currently Viewing:** ${monthNames[state.currentDate.getMonth()]} ${state.currentDate.getFullYear()}`);
-            lines.push('');
+            lines.push(`Today: ${REAL_CURRENT_DATE.toISOString().split('T')[0]} | Viewing: ${mn[state.currentDate.getMonth()]} ${state.currentDate.getFullYear()}`);
 
-            // All months with data
+            // Collect all months
             const allMonthKeys = new Set();
-            state.transactions.forEach(t => {
-                const mk = t.date.substring(0, 7);
-                allMonthKeys.add(mk);
-            });
+            state.transactions.forEach(t => allMonthKeys.add(t.date.substring(0, 7)));
             Object.keys(state.monthlyBalances).forEach(k => allMonthKeys.add(k));
             const sortedMonths = [...allMonthKeys].sort();
 
+            // Determine which months get full detail (current + adjacent)
+            const ci = sortedMonths.indexOf(currentMK);
+            const detailMonths = new Set();
+            if (ci >= 0) { detailMonths.add(sortedMonths[ci]); if (ci > 0) detailMonths.add(sortedMonths[ci - 1]); if (ci < sortedMonths.length - 1) detailMonths.add(sortedMonths[ci + 1]); }
+            else { sortedMonths.slice(-2).forEach(m => detailMonths.add(m)); }
+
             sortedMonths.forEach(mk => {
-                const [year, month] = mk.split('-').map(Number);
-                const monthName = monthNames[month - 1];
+                const [y, m] = mk.split('-').map(Number);
                 const entry = getMonthBalanceEntry(mk);
-                const bankBal = resolveAutoCarryBalance(mk);
-                const monthTxns = state.transactions.filter(t => t.date.startsWith(mk)).sort((a, b) => a.date.localeCompare(b.date));
+                const bal = resolveAutoCarryBalance(mk);
+                const txns = state.transactions.filter(t => t.date.startsWith(mk)).sort((a, b) => a.date.localeCompare(b.date));
+                if (txns.length === 0 && !state.monthlyBalances[mk]) return;
 
-                if (monthTxns.length === 0 && !state.monthlyBalances[mk]) return;
-
-                lines.push(`--- ${monthName} ${year} ---`);
-                lines.push(`Bank Balance: $${bankBal.toFixed(2)}${entry.autoCarry ? ' (auto-carried from previous month)' : ''}`);
-
-                let unclearedW = 0, unclearedD = 0, clearedW = 0, clearedD = 0;
-                monthTxns.forEach(t => {
-                    if (t.status === 'cleared') {
-                        if (t.type === 'withdrawal') clearedW += t.amount;
-                        else clearedD += t.amount;
-                    } else {
-                        if (t.type === 'withdrawal') unclearedW += t.amount;
-                        else unclearedD += t.amount;
-                    }
+                let uW = 0, uD = 0, cW = 0, cD = 0;
+                txns.forEach(t => {
+                    if (t.status === 'cleared') { if (t.type === 'withdrawal') cW += t.amount; else cD += t.amount; }
+                    else { if (t.type === 'withdrawal') uW += t.amount; else uD += t.amount; }
                 });
+                const eom = bal + uD - uW;
 
-                lines.push(`Outstanding Withdrawals: $${unclearedW.toFixed(2)} | Outstanding Deposits: $${unclearedD.toFixed(2)}`);
-                lines.push(`Already Cleared: $${clearedW.toFixed(2)} withdrawn, $${clearedD.toFixed(2)} deposited`);
-                lines.push(`Projected EoM: $${(bankBal + unclearedD - unclearedW).toFixed(2)}`);
-                lines.push('');
-                lines.push('Transactions:');
+                lines.push(`[${mn[m-1]} ${y}] Bank:$${bal.toFixed(2)}${entry.autoCarry?' (carry)':''} | Pending: -$${uW.toFixed(2)} +$${uD.toFixed(2)} | Cleared: -$${cW.toFixed(2)} +$${cD.toFixed(2)} | EoM:$${eom.toFixed(2)}`);
 
-                monthTxns.forEach(t => {
-                    const sign = t.type === 'deposit' ? '+' : '-';
-                    const status = t.status === 'cleared' ? '[CLEARED]' : t.status === 'pending' ? '[PENDING]' : '[UNCLEARED]';
-                    const auto = t.autoProcess ? ' (auto)' : '';
-                    const comment = t.comment ? ` — "${t.comment}"` : '';
-                    lines.push(`  ${t.date} | ${sign}$${t.amount.toFixed(2)} | ${t.name} | ${t.category} | ${status}${auto}${comment}`);
-                });
-                lines.push('');
+                // Full transaction detail only for recent months
+                if (detailMonths.has(mk) && txns.length > 0) {
+                    txns.forEach(t => {
+                        const s = t.type === 'deposit' ? '+' : '-';
+                        const st = t.status === 'cleared' ? 'C' : t.status === 'pending' ? 'P' : 'U';
+                        const c = t.comment ? `|${t.comment}` : '';
+                        lines.push(`  ${t.date.substring(5)}|${s}${t.amount.toFixed(2)}|${t.name}|${t.category}|${st}${t.autoProcess?'A':''}${c}`);
+                    });
+                }
             });
 
-            // Templates
+            // Templates (compact)
             if (state.templates.length > 0) {
-                lines.push('--- RECURRING TEMPLATES ---');
+                lines.push('[Templates]');
                 state.templates.forEach(tpl => {
-                    const sign = tpl.type === 'deposit' ? '+' : '-';
-                    let freq = tpl.frequency;
-                    if (tpl.frequency === 'monthly') freq = `Monthly on days: ${tpl.monthlyDays?.join(', ')}`;
-                    else if (tpl.frequency === 'biweekly') freq = `Bi-weekly from ${tpl.anchorDate}`;
-                    else if (tpl.frequency === 'weekly') freq = `Weekly on days: ${tpl.weeklyDays?.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}`;
-                    else if (tpl.frequency === 'custom') freq = `Custom dates: ${tpl.customDates?.join(', ')}`;
-                    const auto = tpl.autoProcess ? ' [AUTO-PROCESS]' : '';
-                    lines.push(`  ${sign}$${tpl.amount.toFixed(2)} | ${tpl.name} | ${tpl.category} | ${freq}${auto}`);
+                    const s = tpl.type === 'deposit' ? '+' : '-';
+                    let f = tpl.frequency;
+                    if (f === 'monthly') f = `mo:${tpl.monthlyDays?.join(',')}`;
+                    else if (f === 'biweekly') f = `2wk:${tpl.anchorDate}`;
+                    else if (f === 'weekly') f = `wk:${tpl.weeklyDays?.join(',')}`;
+                    else if (f === 'custom') f = `cust:${tpl.customDates?.join(',')}`;
+                    lines.push(`  ${s}${tpl.amount.toFixed(2)}|${tpl.name}|${tpl.category}|${f}${tpl.autoProcess?'|A':''}`);
                 });
             }
 
@@ -2265,6 +2239,7 @@ ${buildWashuContext()}`;
             return text;
         }
 
+
         async function sendWashuRequest() {
             washuIsStreaming = true;
             const sendBtn = document.getElementById('washu-send-btn');
@@ -2285,10 +2260,6 @@ ${buildWashuContext()}`;
                 const systemPrompt = getWashuSystemPrompt();
                 const req = buildProviderRequest(provider, endpoint, model, apiKey, systemPrompt, washuConversation);
 
-                // AbortController with 60-second timeout that covers the ENTIRE request lifecycle
-                const controller = new AbortController();
-                washuAbortController = controller;
-                const timeout = setTimeout(() => controller.abort(), 60000);
                 startWashuTimer('Sent');
                 payloadJson = JSON.stringify(req.body);
                 systemPromptLen = systemPrompt.length;
@@ -2296,43 +2267,27 @@ ${buildWashuContext()}`;
                 const approxTokens = Math.ceil(payloadJson.length / 4);
                 console.log(`Washu [${provider}] payload: ${payloadJson.length} chars (~${approxTokens} tokens), system prompt: ${systemPromptLen} chars, conversation: ${convoLen} chars`);
 
-                const fetchOpts = {
-                    method: 'POST',
-                    headers: req.headers,
-                    body: new Blob([payloadJson], { type: 'application/json' }),
-                    signal: controller.signal
-                };
-
-                // Retry logic for 429 rate limits (up to 3 attempts with backoff)
-                // Don't retry on quota exhaustion — only on temporary per-minute rate limits
-                let response;
-                const maxRetries = 3;
-                for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                    response = await fetch(req.url, fetchOpts);
-                    if (response.status !== 429 || attempt === maxRetries) break;
-                    // Peek at the error to see if it's quota exhaustion (don't retry those)
-                    const peekBody = await response.clone().text();
-                    if (peekBody.includes('exceeded') || peekBody.includes('quota') || peekBody.includes('billing')) break;
-                    const waitSec = attempt * 3;
-                    console.log(`Washu 429 rate-limited, retrying in ${waitSec}s (attempt ${attempt}/${maxRetries})`);
-                    if (target) target.innerHTML = `<i class="ph-bold ph-spinner washu-spinner mr-1.5"></i>Rate-limited — retrying in ${waitSec}s...`;
-                    await new Promise(r => setTimeout(r, waitSec * 1000));
-                }
-
-                if (!response.ok) {
-                    clearTimeout(timeout);
-                    const errBody = await response.text();
-                    console.error('Washu API raw error:', response.status, errBody);
-                    let apiMsg = '';
-                    try {
-                        const errJson = JSON.parse(errBody);
-                        apiMsg = errJson?.error?.message || '';
-                    } catch(_) {}
-                    throw new Error(`API error ${response.status}: ${apiMsg || errBody.substring(0, 500)}`);
-                }
-
-                const result = await response.json();
-                clearTimeout(timeout);
+                // XHR with Blob body — bypasses extension fetch hooks + avoids setRequestHeader issues
+                const result = await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    washuAbortController = { abort: () => xhr.abort() };
+                    xhr.open('POST', req.url);
+                    xhr.timeout = 120000;
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(new Error('Invalid JSON response')); }
+                        } else {
+                            let apiMsg = '';
+                            try { apiMsg = JSON.parse(xhr.responseText)?.error?.message || ''; } catch(_) {}
+                            reject(new Error(`API error ${xhr.status}: ${apiMsg || xhr.responseText.substring(0, 500)}`));
+                        }
+                    };
+                    xhr.onerror = () => reject(new TypeError('Network request failed'));
+                    xhr.ontimeout = () => reject(new DOMException('Request timed out', 'AbortError'));
+                    xhr.onabort = () => reject(new DOMException('Request cancelled', 'AbortError'));
+                    // Send as Blob — auto-sets Content-Type, no setRequestHeader needed
+                    xhr.send(new Blob([payloadJson], { type: 'application/json' }));
+                });
                 fullText = parseProviderResponse(provider, result);
 
                 if (!fullText) {
@@ -2375,12 +2330,7 @@ ${buildWashuContext()}`;
                     errorMsg += err.message;
                 }
 
-                // Show diagnostics so we can debug persistent failures
-                const diagLine = payloadJson
-                    ? `<br><span class="text-xs text-slate-500 mt-2 block font-mono">provider: ${provider} | model: ${model} | payload: ${payloadJson.length} chars (~${Math.ceil(payloadJson.length / 4)} tokens) | prompt: ${systemPromptLen} chars | convo: ${convoLen} chars</span>`
-                    : '';
-
-                target.innerHTML = `<span class="text-rose-600">${errorMsg}</span>${diagLine}`;
+                target.innerHTML = `<span class="text-rose-600">${errorMsg}</span>`;
                 // Remove the failed message from conversation
                 washuConversation.pop();
             } finally {
