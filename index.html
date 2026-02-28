@@ -22,7 +22,8 @@
         }
     </script>
     <style>
-        body { background-color: #f4f7f9; }
+        body { background-color: #f4f7f9; height: 100dvh; }
+        @supports not (height: 100dvh) { body { height: -webkit-fill-available; } }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -45,9 +46,21 @@
         .toggle-label { transition: all 0.3s; }
 
         .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms; }
+
+        /* Washu chat message styling */
+        .washu-msg p { margin-bottom: 0.5rem; }
+        .washu-msg p:last-child { margin-bottom: 0; }
+        .washu-msg strong { font-weight: 700; color: #1e293b; }
+        .washu-msg ul, .washu-msg ol { margin: 0.5rem 0; padding-left: 1.25rem; }
+        .washu-msg li { margin-bottom: 0.25rem; }
+        .washu-msg code { background: #e2e8f0; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.8em; }
+        .washu-typing::after { content: '▊'; animation: blink 0.7s infinite; color: #a855f7; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        @keyframes washu-spin { to { transform: rotate(360deg); } }
+        .washu-spinner { display: inline-block; animation: washu-spin 1s linear infinite; }
     </style>
 </head>
-<body class="text-slate-800 h-screen flex overflow-hidden antialiased">
+<body class="text-slate-800 flex overflow-hidden antialiased">
 
     <!-- LOGIN OVERLAY -->
     <div id="login-overlay" class="fixed inset-0 bg-slate-900 z-[200] flex flex-col items-center justify-center transition-opacity duration-500">
@@ -148,7 +161,10 @@
                     <i class="ph-bold ph-chart-polar text-2xl lg:text-xl"></i><span class="hidden lg:block">Insights</span>
                 </button>
                 
-                <div class="mt-auto pt-4 border-t border-slate-100">
+                <div class="mt-auto pt-4 border-t border-slate-100 space-y-2">
+                    <button onclick="openModal('settings')" class="w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-700 font-semibold transition-all">
+                        <i class="ph-bold ph-gear-six text-2xl lg:text-xl"></i><span class="hidden lg:block">Settings</span>
+                    </button>
                     <button onclick="logoutUser()" class="w-full flex items-center justify-center lg:justify-start space-x-3 px-4 py-3.5 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600 font-semibold transition-all">
                         <i class="ph-bold ph-sign-out text-2xl lg:text-xl"></i><span class="hidden lg:block">Sign Out</span>
                     </button>
@@ -161,6 +177,7 @@
             <button onclick="switchTab('ledger')" class="flex flex-col items-center p-2 text-brand-600"><i class="ph-bold ph-list-numbers text-2xl mb-1"></i><span class="text-[10px] font-bold uppercase tracking-wider">Ledger</span></button>
             <button onclick="switchTab('templates')" class="flex flex-col items-center p-2 text-slate-400"><i class="ph-bold ph-calendar-plus text-2xl mb-1"></i><span class="text-[10px] font-bold uppercase tracking-wider">Templates</span></button>
             <button onclick="switchTab('dashboard')" class="flex flex-col items-center p-2 text-slate-400"><i class="ph-bold ph-chart-polar text-2xl mb-1"></i><span class="text-[10px] font-bold uppercase tracking-wider">Insights</span></button>
+            <button onclick="openModal('settings')" class="flex flex-col items-center p-2 text-slate-400"><i class="ph-bold ph-gear-six text-2xl mb-1"></i><span class="text-[10px] font-bold uppercase tracking-wider">Settings</span></button>
         </div>
 
         <main class="flex-1 flex flex-col h-full overflow-hidden relative">
@@ -175,10 +192,17 @@
                 </div>
                 
                 <div class="flex items-center gap-3 lg:gap-6">
-                    <div class="flex items-center bg-slate-50 px-4 py-2 rounded-full border border-slate-200 shadow-sm">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2 hidden md:block">Bank:</span>
+                    <button onclick="openWashuChat()" id="btn-ask-washu" class="bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 text-white px-3 lg:px-4 py-2 rounded-full font-bold shadow-lg shadow-fuchsia-500/20 flex items-center transition-all transform hover:scale-105 text-sm hide" title="Ask Washu">
+                        <i class="ph-fill ph-brain text-lg lg:mr-1.5"></i><span class="hidden lg:inline">Ask Washu</span>
+                    </button>
+                    <div class="flex items-center bg-slate-50 px-4 py-2 rounded-full border border-slate-200 shadow-sm gap-2">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden md:block">Bank:</span>
                         <span class="text-slate-400 font-bold">$</span>
-                        <input type="number" id="manual-bank-balance" class="font-extrabold text-slate-800 w-24 outline-none bg-transparent" onchange="updateBankBalance(this.value)">
+                        <input type="number" id="manual-bank-balance" class="font-extrabold text-slate-800 w-24 outline-none bg-transparent disabled:text-slate-400 disabled:cursor-not-allowed" onchange="updateBankBalance(this.value)">
+                        <label class="flex items-center gap-1 cursor-pointer ml-1 border-l border-slate-200 pl-2" title="Auto-carry: use previous month's end-of-month balance">
+                            <input type="checkbox" id="auto-carry-checkbox" class="accent-brand-500 w-3.5 h-3.5 cursor-pointer" onchange="toggleAutoCarry(this.checked)">
+                            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider hidden md:block">Auto</span>
+                        </label>
                     </div>
                     
                     <button onclick="openTransactionModal()" class="bg-slate-900 hover:bg-brand-600 text-white p-2 lg:px-5 lg:py-2.5 rounded-full font-semibold shadow-lg shadow-slate-900/20 flex items-center transition-all transform hover:scale-105">
@@ -201,17 +225,29 @@
                         <span class="text-sm font-bold">Historical View: This month is in the past. Template changes will not alter these records.</span>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-                        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-center relative overflow-hidden">
-                            <div class="absolute top-0 right-0 p-4 opacity-5 text-slate-400"><i class="ph-fill ph-hourglass-high text-7xl"></i></div>
-                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 z-10">Remaining to Process</span>
-                            <div id="metric-remaining" class="text-3xl font-extrabold text-slate-900 mt-1 tracking-tight z-10">$0.00</div>
-                        </div>
-                        <div class="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-3xl shadow-xl shadow-slate-900/20 flex flex-col justify-center relative overflow-hidden text-white">
-                            <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-                            <div class="absolute top-0 right-0 p-4 opacity-10"><i class="ph-fill ph-check-circle text-7xl"></i></div>
-                            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 z-10">Projected EOM Balance</span>
-                            <div id="metric-projected" class="text-3xl font-extrabold mt-1 tracking-tight z-10 text-emerald-400">$0.00</div>
+                    <div class="sticky top-0 z-20 -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-4 bg-[#f4f7f9]">
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+                            <div class="bg-white p-4 lg:p-5 rounded-2xl border border-rose-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-3 opacity-5 text-rose-300"><i class="ph-fill ph-arrow-circle-down text-5xl"></i></div>
+                                <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider mb-1 z-10">Withdrawals Left</span>
+                                <div id="metric-withdrawals" class="text-xl lg:text-2xl font-extrabold text-rose-600 tracking-tight z-10">$0.00</div>
+                            </div>
+                            <div class="bg-white p-4 lg:p-5 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-3 opacity-5 text-emerald-300"><i class="ph-fill ph-arrow-circle-up text-5xl"></i></div>
+                                <span class="text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1 z-10">Deposits Left</span>
+                                <div id="metric-deposits" class="text-xl lg:text-2xl font-extrabold text-emerald-600 tracking-tight z-10">$0.00</div>
+                            </div>
+                            <div class="bg-white p-4 lg:p-5 rounded-2xl border border-brand-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-3 opacity-5 text-brand-300"><i class="ph-fill ph-scales text-5xl"></i></div>
+                                <span class="text-[10px] font-bold text-brand-500 uppercase tracking-wider mb-1 z-10">Overall Delta</span>
+                                <div id="metric-delta" class="text-xl lg:text-2xl font-extrabold text-slate-900 tracking-tight z-10">$0.00</div>
+                            </div>
+                            <div class="bg-gradient-to-br from-slate-900 to-slate-800 p-4 lg:p-5 rounded-2xl shadow-lg shadow-slate-900/20 flex flex-col justify-center relative overflow-hidden text-white">
+                                <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+                                <div class="absolute top-0 right-0 p-3 opacity-10"><i class="ph-fill ph-bank text-5xl"></i></div>
+                                <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wider mb-1 z-10">Projected EOM</span>
+                                <div id="metric-projected" class="text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-emerald-400">$0.00</div>
+                            </div>
                         </div>
                     </div>
 
@@ -239,7 +275,7 @@
                 <div id="view-templates" class="max-w-7xl mx-auto hide space-y-6">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-3xl border border-slate-200 shadow-sm gap-4">
                         <div>
-                            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Recurring Rules</h2>
+                            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Recurring</h2>
                             <p class="text-slate-500 text-sm mt-1">Changes here affect current and future months. Past months are locked.</p>
                         </div>
                         <div class="flex items-center space-x-4 w-full md:w-auto">
@@ -247,6 +283,9 @@
                                 <button onclick="setTemplateView('category')" id="btn-view-cat" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-white text-brand-600 shadow-sm transition-all">By Category</button>
                                 <button onclick="setTemplateView('recurrence')" id="btn-view-rec" class="px-3 py-1.5 text-xs font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all">By Recurrence</button>
                             </div>
+                            <button onclick="refreshLedgerFromTemplates()" class="flex-1 md:flex-none justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold flex items-center transition-all border border-slate-200" title="Re-sync all templates to the current month's ledger">
+                                <i class="ph-bold ph-arrows-clockwise mr-2"></i> Refresh Ledger
+                            </button>
                             <button onclick="openTemplateModal()" class="flex-1 md:flex-none justify-center bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-500/30 flex items-center transition-all">
                                 <i class="ph-bold ph-plus mr-2"></i> New
                             </button>
@@ -263,6 +302,10 @@
                     <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                         <h3 class="font-bold text-slate-800 mb-6 flex items-center"><i class="ph-fill ph-trend-up text-brand-500 mr-2 text-xl"></i> Running Impact Trend</h3>
                         <div class="relative h-64 w-full"><canvas id="balanceTrendChart"></canvas></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                        <h3 class="font-bold text-slate-800 mb-6 flex items-center"><i class="ph-fill ph-calendar-dots text-brand-500 mr-2 text-xl"></i> Year Overview <span id="yearOverviewLabel" class="ml-2 text-sm font-semibold text-slate-400"></span></h3>
+                        <div class="relative h-80 w-full"><canvas id="yearOverviewChart"></canvas></div>
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
@@ -288,6 +331,7 @@
                 <button onclick="closeModal('transaction')" class="text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-100 rounded-full p-1.5 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
             </div>
             <form id="form-transaction" onsubmit="handleTransactionSubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="txn-id">
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Date</label>
@@ -393,12 +437,18 @@
                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Recurrence Pattern</label>
                     <select id="tpl-frequency" onchange="toggleFrequencyUI()" class="w-full border border-slate-200 rounded-xl px-4 py-2 mb-4 outline-none text-slate-700 font-bold bg-slate-50 cursor-pointer">
                         <option value="monthly">Monthly (Dates of Month)</option>
+                        <option value="biweekly">Bi-Weekly (Every 2 Weeks)</option>
                         <option value="weekly">Weekly (Days of Week)</option>
                         <option value="custom">Specific Dates (Yearly)</option>
                     </select>
                     <div id="tpl-ui-monthly" class="transition-all">
                         <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Select Dates</label>
                         <div class="grid grid-cols-7 gap-1.5" id="tpl-monthly-grid"></div>
+                    </div>
+                    <div id="tpl-ui-biweekly" class="hide transition-all">
+                        <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Anchor Date (first occurrence)</label>
+                        <input type="date" id="tpl-anchor-date" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-medium bg-slate-50">
+                        <p class="text-[10px] text-slate-400 mt-2">Pick any date this item occurs. Every 14 days will be calculated from it.</p>
                     </div>
                     <div id="tpl-ui-weekly" class="hide transition-all">
                         <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Select Days</label>
@@ -417,9 +467,126 @@
                 </div>
                 <div class="pt-4 flex justify-end space-x-3 border-t border-slate-100 shrink-0">
                     <button type="button" onclick="closeModal('template')" class="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold">Cancel</button>
-                    <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-brand-600 text-white rounded-xl font-bold shadow-md" id="tpl-save-btn">Save Rule</button>
+                    <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-brand-600 text-white rounded-xl font-bold shadow-md" id="tpl-save-btn">Save Recurring</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="modal-settings" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[100] px-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300 max-h-[85vh] flex flex-col">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                <h3 class="font-extrabold text-lg text-slate-800"><i class="ph-bold ph-gear-six mr-2 text-slate-500"></i>Settings</h3>
+                <button onclick="closeModal('settings')" class="text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-100 rounded-full p-1.5 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-6 overflow-y-auto flex-1">
+                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-1 flex items-center"><i class="ph-bold ph-download-simple mr-2 text-brand-500"></i>Export Data</h4>
+                    <p class="text-xs text-slate-500 mb-4">Download all your templates, transactions, and settings as a JSON backup file.</p>
+                    <button onclick="exportData()" class="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl font-bold shadow-md transition-all flex items-center justify-center">
+                        <i class="ph-bold ph-file-arrow-down mr-2 text-lg"></i> Export Backup
+                    </button>
+                </div>
+                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-1 flex items-center"><i class="ph-bold ph-brain mr-2 text-fuchsia-500"></i>Ask Washu (AI)</h4>
+                    <p class="text-xs text-slate-500 mb-4">Connect an AI provider to enable the Washu assistant.</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Provider</label>
+                            <select id="settings-washu-provider" onchange="onWashuProviderChange()" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400 bg-white">
+                                <option value="gemini">Google Gemini</option>
+                                <option value="openai-compatible">OpenAI-Compatible (Ollama, LM Studio, etc.)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Endpoint URL</label>
+                            <input type="text" id="settings-washu-endpoint" placeholder="https://generativelanguage.googleapis.com/v1beta" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-mono text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400">
+                            <p id="washu-endpoint-hint" class="text-[10px] text-slate-400 mt-1">Default endpoint is pre-filled. Edit only if needed.</p>
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Model</label>
+                            <input type="text" id="settings-washu-model" placeholder="gemini-2.0-flash" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-mono text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center">
+                                API Key
+                                <span id="washu-key-required" class="ml-1.5 text-rose-400">(required)</span>
+                            </label>
+                            <input type="password" id="settings-washu-key" placeholder="AIza..." class="w-full border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 font-mono text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400">
+                            <p id="washu-key-hint" class="text-[10px] text-slate-400 mt-1">Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" class="font-bold text-brand-600 hover:underline">aistudio.google.com</a></p>
+                        </div>
+                        <div id="washu-mixed-content-warning" class="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 hidden">
+                            <p class="text-[11px] font-bold text-amber-700 flex items-center"><i class="ph-fill ph-warning mr-1.5"></i>Your browser may block http:// requests from this https:// page. Use HTTPS for the endpoint or access BUFT over HTTP.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="testWashuConnection()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2.5 rounded-xl font-bold transition-all text-sm flex items-center justify-center">
+                                <i class="ph-bold ph-plugs-connected mr-1.5"></i> Test
+                            </button>
+                            <button onclick="saveWashuProvider()" class="flex-1 bg-fuchsia-600 hover:bg-fuchsia-700 text-white py-2.5 rounded-xl font-bold shadow-md transition-all text-sm">Save</button>
+                        </div>
+                    </div>
+                    <p id="washu-provider-status" class="text-[11px] font-bold mt-2 text-slate-400"></p>
+                </div>
+                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-1 flex items-center"><i class="ph-bold ph-upload-simple mr-2 text-amber-500"></i>Import Data</h4>
+                    <p class="text-xs text-slate-500 mb-2">Restore from a previously exported backup file.</p>
+                    <div class="bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-4">
+                        <p class="text-[11px] font-bold text-rose-700 flex items-center"><i class="ph-fill ph-warning mr-1.5"></i>This will wipe all existing data and replace it with the backup.</p>
+                    </div>
+                    <label class="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl font-bold shadow-md transition-all flex items-center justify-center cursor-pointer">
+                        <i class="ph-bold ph-file-arrow-up mr-2 text-lg"></i> Choose Backup File
+                        <input type="file" accept=".json" onchange="importData(event)" class="hidden">
+                    </label>
+                    <div id="import-status" class="mt-3 text-center text-sm font-bold hidden"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Washu AI Chat Modal -->
+    <div id="modal-washu" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center z-[100] px-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-95 transition-transform duration-300 max-h-[85vh] flex flex-col">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-fuchsia-50 to-purple-50 shrink-0">
+                <div class="flex items-center">
+                    <div class="bg-gradient-to-br from-fuchsia-500 to-purple-600 p-2 rounded-xl mr-3 shadow-md shadow-fuchsia-500/20">
+                        <i class="ph-fill ph-brain text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-slate-800 text-base">Ask Washu</h3>
+                        <p class="text-[10px] font-bold text-fuchsia-500 uppercase tracking-widest">Bienvenu Family AI</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="washu-api-timer" class="text-[10px] font-bold text-slate-400 bg-white px-2.5 py-1 rounded-full border border-slate-200 hidden whitespace-nowrap"><i class="ph-bold ph-clock mr-1"></i><span id="washu-timer-text"></span></span>
+                    <button onclick="clearWashuChat()" class="text-slate-400 hover:text-fuchsia-600 bg-white hover:bg-fuchsia-50 rounded-full p-1.5 transition-colors" title="New conversation"><i class="ph-bold ph-arrow-counter-clockwise text-lg"></i></button>
+                    <button onclick="closeModal('washu')" class="text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-100 rounded-full p-1.5 transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
+                </div>
+            </div>
+            <div id="washu-messages" class="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]">
+                <div class="flex gap-3">
+                    <div class="bg-gradient-to-br from-fuchsia-500 to-purple-600 w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md">
+                        <i class="ph-fill ph-brain text-white text-sm"></i>
+                    </div>
+                    <div class="bg-slate-50 rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] border border-slate-100">
+                        <p class="text-sm text-slate-700 leading-relaxed">Hey there! I'm <strong>Washu</strong>, the Bienvenu Family AI — greatest genius in the universe, naturally. 😏</p>
+                        <p class="text-sm text-slate-700 leading-relaxed mt-2">Ask me anything about your finances. I can see all your BUFT data across every month.</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 ml-11">
+                    <button onclick="askWashuQuick('What\\'s my biggest expense this month?')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Biggest expense?</button>
+                    <button onclick="askWashuQuick('Am I on track to end the month positive?')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Am I on track?</button>
+                    <button onclick="askWashuQuick('Summarize my financial situation across all months.')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Full summary</button>
+                </div>
+            </div>
+            <div class="px-4 py-3 border-t border-slate-100 bg-slate-50/50 shrink-0">
+                <form onsubmit="handleWashuSubmit(event)" class="flex gap-2">
+                    <input type="text" id="washu-input" placeholder="Ask Washu anything..." class="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 outline-none text-slate-700 text-sm shadow-sm focus:ring-2 focus:ring-fuchsia-400 focus:border-fuchsia-400" autocomplete="off">
+                    <button type="submit" id="washu-send-btn" class="bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md transition-all flex items-center">
+                        <i class="ph-bold ph-paper-plane-tilt"></i>
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -427,7 +594,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { initializeFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase Config
         const firebaseConfig = {
@@ -456,13 +623,14 @@
         const WINDOW_END = new Date(2026, 11, 31);
 
         window.state = {
-            currentDate: new Date(REAL_CURRENT_DATE), 
-            bankBalance: 0,
-            templateViewMode: 'category', 
-            initializedMonths: [], 
+            currentDate: new Date(REAL_CURRENT_DATE),
+            monthlyBalances: {},
+            templateViewMode: 'category',
+            initializedMonths: [],
             transactions: [],
             templates: [],
-            hasAcceptedTerms: false
+            hasAcceptedTerms: false,
+            pastRowsCollapsed: true
         };
 
         // --- AUTH LOGIC ---
@@ -513,14 +681,27 @@
                 const snap = await getDoc(settingsRef);
                 if (!snap.exists()) {
                     // Start fresh if user doc doesn't exist (e.g. after a purge)
-                    await setDoc(settingsRef, { bankBalance: 0, initializedMonths: [], hasAcceptedTerms: false });
+                    await setDoc(settingsRef, { monthlyBalances: {}, initializedMonths: [], hasAcceptedTerms: false });
                 }
 
                 onSnapshot(settingsRef, (docSnap) => {
                     if(docSnap.exists()) {
-                        state.bankBalance = docSnap.data().bankBalance || 0;
-                        state.initializedMonths = docSnap.data().initializedMonths || [];
-                        state.hasAcceptedTerms = docSnap.data().hasAcceptedTerms || false;
+                        const data = docSnap.data();
+                        // Migration: old single bankBalance → per-month format
+                        if (data.monthlyBalances) {
+                            state.monthlyBalances = data.monthlyBalances;
+                        } else if (typeof data.bankBalance === 'number') {
+                            const currentKey = getMonthKey(REAL_CURRENT_DATE.getFullYear(), REAL_CURRENT_DATE.getMonth());
+                            state.monthlyBalances = { [currentKey]: { amount: data.bankBalance, autoCarry: false } };
+                            // Persist migrated format back to Firestore
+                            setDoc(settingsRef, { monthlyBalances: state.monthlyBalances }, { merge: true });
+                        } else {
+                            state.monthlyBalances = {};
+                        }
+                        state.initializedMonths = data.initializedMonths || [];
+                        state.hasAcceptedTerms = data.hasAcceptedTerms || false;
+                        // Load Washu AI provider config (try-catch to never block init)
+                        try { loadWashuProviderFromSettings(data); } catch(e) { console.error('Washu config load error:', e); }
                     }
                     dataLoaded.settings = true;
                     checkReadyToInit(safetyTimer);
@@ -623,7 +804,7 @@
         const daysOfWeek = [ { id: 0, label: 'S' }, { id: 1, label: 'M' }, { id: 2, label: 'T' }, { id: 3, label: 'W' }, { id: 4, label: 'T' }, { id: 5, label: 'F' }, { id: 6, label: 'S' } ];
 
         let tempCustomDates = []; 
-        let cashflowChartObj = null; let categoryChartObj = null; let balanceTrendChartObj = null;
+        let cashflowChartObj = null; let categoryChartObj = null; let balanceTrendChartObj = null; let yearOverviewChartObj = null;
 
         function getCatColorClass(type, catName) {
             const list = categoryConfig[type] || [];
@@ -641,7 +822,22 @@
         function updateHeader() {
             const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
             document.getElementById('current-month-display').innerText = `${monthNames[state.currentDate.getMonth()]} ${state.currentDate.getFullYear()}`;
-            document.getElementById('manual-bank-balance').value = state.bankBalance.toFixed(2);
+
+            const key = getCurrentMonthKey();
+            const entry = getMonthBalanceEntry(key);
+            const balanceInput = document.getElementById('manual-bank-balance');
+            const autoCarryCb = document.getElementById('auto-carry-checkbox');
+
+            if (entry.autoCarry) {
+                const carried = resolveAutoCarryBalance(key);
+                balanceInput.value = carried.toFixed(2);
+                balanceInput.disabled = true;
+                autoCarryCb.checked = true;
+            } else {
+                balanceInput.value = entry.amount.toFixed(2);
+                balanceInput.disabled = false;
+                autoCarryCb.checked = false;
+            }
 
             const btnPrev = document.getElementById('btn-prev-month');
             const btnNext = document.getElementById('btn-next-month');
@@ -653,6 +849,33 @@
             const isPastMonth = state.currentDate.getFullYear() < REAL_CURRENT_DATE.getFullYear() || (state.currentDate.getFullYear() === REAL_CURRENT_DATE.getFullYear() && state.currentDate.getMonth() < REAL_CURRENT_DATE.getMonth());
             if(isPastMonth) document.getElementById('archival-notice').classList.remove('hide');
             else document.getElementById('archival-notice').classList.add('hide');
+        }
+
+        window.togglePastRows = function() {
+            state.pastRowsCollapsed = !state.pastRowsCollapsed;
+            const allRows = document.querySelectorAll('.past-ledger-row');
+            const unclearedRows = document.querySelectorAll('.past-ledger-row.past-uncleared');
+            const clearedCount = allRows.length - unclearedRows.length;
+            const icon = document.getElementById('past-toggle-icon');
+            const label = document.getElementById('past-toggle-label');
+            if (state.pastRowsCollapsed) {
+                allRows.forEach(r => { r.style.display = r.classList.contains('past-uncleared') ? '' : 'none'; });
+                if (icon) icon.className = 'ph-fill ph-caret-right mr-1.5';
+                if (label) label.textContent = pastCollapseLabel(true, allRows.length, clearedCount, unclearedRows.length);
+            } else {
+                allRows.forEach(r => r.style.display = '');
+                if (icon) icon.className = 'ph-fill ph-caret-down mr-1.5';
+                if (label) label.textContent = pastCollapseLabel(false, allRows.length, clearedCount, unclearedRows.length);
+            }
+        }
+
+        function pastCollapseLabel(collapsed, total, cleared, uncleared) {
+            if (collapsed) {
+                let txt = `(${cleared} cleared hidden`;
+                if (uncleared > 0) txt += ` · ${uncleared} uncleared`;
+                return txt + ')';
+            }
+            return `(${total} past item${total !== 1 ? 's' : ''} shown)`;
         }
 
         window.scrollToTodayDivider = function() {
@@ -679,13 +902,132 @@
             scrollToTodayDivider();
         }
 
+        function getCurrentMonthKey() {
+            return getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
+        }
+
+        function getMonthBalanceEntry(monthKey) {
+            return state.monthlyBalances[monthKey] || { amount: 0, autoCarry: false };
+        }
+
+        function getNetDeltaForMonth(monthKey) {
+            const [year, month] = monthKey.split('-').map(Number);
+            const txns = state.transactions.filter(t => {
+                const d = new Date(t.date + 'T00:00:00');
+                return d.getFullYear() === year && (d.getMonth() + 1) === month;
+            });
+            let delta = 0;
+            txns.forEach(t => {
+                if (t.status !== 'cleared') {
+                    delta += t.type === 'deposit' ? t.amount : -t.amount;
+                }
+            });
+            return delta;
+        }
+
+        function getPrevMonthKey(monthKey) {
+            const [year, month] = monthKey.split('-').map(Number);
+            const d = new Date(year, month - 2, 1);
+            return getMonthKey(d.getFullYear(), d.getMonth());
+        }
+
+        function resolveAutoCarryBalance(monthKey, visited) {
+            if (!visited) visited = new Set();
+            if (visited.has(monthKey)) return 0;
+            visited.add(monthKey);
+
+            const entry = getMonthBalanceEntry(monthKey);
+            if (!entry.autoCarry) return entry.amount;
+
+            // Auto-carry = previous month's Projected EoM
+            // i.e. prev bank balance + prev non-cleared delta
+            // (cleared items are already reflected in the bank balance)
+            const prevKey = getPrevMonthKey(monthKey);
+            const prevStarting = resolveAutoCarryBalance(prevKey, visited);
+
+            const [year, month] = prevKey.split('-').map(Number);
+            const prevTxns = state.transactions.filter(t => {
+                const d = new Date(t.date + 'T00:00:00');
+                return d.getFullYear() === year && (d.getMonth() + 1) === month;
+            });
+            let prevDelta = 0;
+            prevTxns.forEach(t => {
+                if (t.status !== 'cleared') {
+                    prevDelta += t.type === 'deposit' ? t.amount : -t.amount;
+                }
+            });
+
+            return prevStarting + prevDelta;
+        }
+
+        function getBankBalanceForCurrentMonth() {
+            return resolveAutoCarryBalance(getCurrentMonthKey());
+        }
+
         window.updateBankBalance = function(val) {
             const num = parseFloat(val) || 0;
-            setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { bankBalance: num }, { merge: true });
+            const key = getCurrentMonthKey();
+            state.monthlyBalances[key] = { amount: num, autoCarry: false };
+            // Uncheck auto-carry since user manually typed a value
+            const cb = document.getElementById('auto-carry-checkbox');
+            if (cb) cb.checked = false;
+            setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { monthlyBalances: state.monthlyBalances }, { merge: true });
+        }
+
+        window.toggleAutoCarry = function(checked) {
+            const key = getCurrentMonthKey();
+            const entry = getMonthBalanceEntry(key);
+            if (checked) {
+                const carried = resolveAutoCarryBalance(key);
+                state.monthlyBalances[key] = { amount: carried, autoCarry: true };
+                document.getElementById('manual-bank-balance').value = carried.toFixed(2);
+                document.getElementById('manual-bank-balance').disabled = true;
+            } else {
+                state.monthlyBalances[key] = { amount: entry.amount, autoCarry: false };
+                document.getElementById('manual-bank-balance').disabled = false;
+            }
+            setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { monthlyBalances: state.monthlyBalances }, { merge: true });
         }
 
         // --- ASYNC CLOUD LOGIC: Auto-injector ---
         function getMonthKey(year, monthIndex) { return `${year}-${(monthIndex + 1).toString().padStart(2, '0')}`; }
+
+        function getTemplateDatesForMonth(tpl, year, monthIndex) {
+            const monthStr = (monthIndex + 1).toString().padStart(2, '0');
+            let dates = [];
+            if (tpl.frequency === 'monthly' && Array.isArray(tpl.monthlyDays)) {
+                tpl.monthlyDays.forEach(day => {
+                    const d = Math.min(day, new Date(year, monthIndex + 1, 0).getDate());
+                    dates.push(`${year}-${monthStr}-${d.toString().padStart(2, '0')}`);
+                });
+            } else if (tpl.frequency === 'weekly' && Array.isArray(tpl.weeklyDays)) {
+                let date = new Date(year, monthIndex, 1);
+                while (date.getMonth() === monthIndex) {
+                    if (tpl.weeklyDays.includes(date.getDay())) dates.push(`${year}-${monthStr}-${date.getDate().toString().padStart(2, '0')}`);
+                    date.setDate(date.getDate() + 1);
+                }
+            } else if (tpl.frequency === 'biweekly' && tpl.anchorDate) {
+                const anchor = new Date(tpl.anchorDate + 'T00:00:00');
+                const firstOfMonth = new Date(year, monthIndex, 1);
+                const lastOfMonth = new Date(year, monthIndex + 1, 0);
+                const msPerDay = 86400000;
+                const diffDays = Math.round((firstOfMonth - anchor) / msPerDay);
+                const mod = ((diffDays % 14) + 14) % 14;
+                const startOffset = mod === 0 ? 0 : 14 - mod;
+                let d = new Date(firstOfMonth);
+                d.setDate(d.getDate() + startOffset);
+                while (d <= lastOfMonth) {
+                    dates.push(`${year}-${monthStr}-${d.getDate().toString().padStart(2, '0')}`);
+                    d.setDate(d.getDate() + 14);
+                }
+            } else if (tpl.frequency === 'custom' && Array.isArray(tpl.customDates)) {
+                tpl.customDates.forEach(cd => {
+                    const [m, d] = cd.split('/');
+                    if (parseInt(m) === monthIndex + 1) dates.push(`${year}-${monthStr}-${d.padStart(2, '0')}`);
+                });
+            }
+            return dates;
+        }
 
         async function initializeMonth(year, monthIndex) {
             const monthKey = getMonthKey(year, monthIndex);
@@ -696,28 +1038,7 @@
             batch.set(doc(db, 'users', currentUser.uid, 'settings', 'main'), { initializedMonths: state.initializedMonths }, { merge: true });
 
             state.templates.forEach(tpl => {
-                const monthStr = (monthIndex + 1).toString().padStart(2, '0');
-                let datesToInject = [];
-
-                if (tpl.frequency === 'monthly' && Array.isArray(tpl.monthlyDays)) {
-                    tpl.monthlyDays.forEach(day => {
-                        const d = Math.min(day, new Date(year, monthIndex + 1, 0).getDate());
-                        datesToInject.push(`${year}-${monthStr}-${d.toString().padStart(2, '0')}`);
-                    });
-                } else if (tpl.frequency === 'weekly' && Array.isArray(tpl.weeklyDays)) {
-                    let date = new Date(year, monthIndex, 1);
-                    while (date.getMonth() === monthIndex) {
-                        if (tpl.weeklyDays.includes(date.getDay())) datesToInject.push(`${year}-${monthStr}-${date.getDate().toString().padStart(2, '0')}`);
-                        date.setDate(date.getDate() + 1);
-                    }
-                } else if (tpl.frequency === 'custom' && Array.isArray(tpl.customDates)) {
-                    tpl.customDates.forEach(cd => {
-                        const [m, d] = cd.split('/');
-                        if (parseInt(m) === monthIndex + 1) datesToInject.push(`${year}-${monthStr}-${d.padStart(2, '0')}`);
-                    });
-                }
-
-                datesToInject.forEach(dateStr => {
+                getTemplateDatesForMonth(tpl, year, monthIndex).forEach(dateStr => {
                     const id = `tplgen_${tpl.id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
                     const txn = { id, templateId: tpl.id, date: dateStr, name: tpl.name, amount: tpl.amount, type: tpl.type, category: tpl.category, status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: '' };
                     batch.set(doc(db, 'users', currentUser.uid, 'transactions', id), txn);
@@ -725,6 +1046,7 @@
             });
             await batch.commit();
         }
+
 
         async function processAutoClear() {
             const todayStr = REAL_CURRENT_DATE.toISOString().split('T')[0];
@@ -741,33 +1063,50 @@
         }
 
         // --- LEDGER ---
+        // Helper: current month key for past-month protection
+        const CURRENT_MONTH_KEY = getMonthKey(REAL_CURRENT_DATE.getFullYear(), REAL_CURRENT_DATE.getMonth());
+
         function renderLedger() {
             const tbody = document.getElementById('ledger-body');
             tbody.innerHTML = '';
-            
+
             const txns = getMonthlyTransactions();
-            let runningTotal = 0; let remainingImpact = 0;
+            let runningTotal = 0; let remainingWithdrawals = 0; let remainingDeposits = 0;
             const todayStr = REAL_CURRENT_DATE.toISOString().split('T')[0];
+            const viewingMonthKey = getMonthKey(state.currentDate.getFullYear(), state.currentDate.getMonth());
+            const isViewingPastMonth = viewingMonthKey < CURRENT_MONTH_KEY;
 
             if(txns.length === 0) tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400 font-medium italic">No entries for this month. Templates will populate on first view.</td></tr>`;
 
             let dividerDrawn = false;
+            const pastRows = [];
+            const pastItemCount = txns.filter(t => t.date < todayStr).length;
+            const pastUnclearedCount = txns.filter(t => t.date < todayStr && t.status !== 'cleared').length;
+            const pastClearedCount = pastItemCount - pastUnclearedCount;
 
             txns.forEach((txn) => {
                 if (!dividerDrawn && txn.date >= todayStr) {
-                    const hasPastItems = txns.some(t => t.date < todayStr);
-                    if (hasPastItems || txn.date === todayStr) {
-                        const divTr = document.createElement('tr');
-                        divTr.id = 'today-divider';
-                        divTr.className = 'bg-yellow-100/50 border-y-2 border-yellow-400';
-                        divTr.innerHTML = `<td colspan="7" class="py-2.5 px-6 text-center shadow-sm"><span class="text-[11px] font-extrabold uppercase tracking-widest text-yellow-800 flex items-center justify-center"><i class="ph-fill ph-star mr-1.5"></i> Today & Future</span></td>`;
-                        tbody.appendChild(divTr);
+                    if (pastItemCount > 0) {
+                        // Insert the collapsible toggle bar
+                        const toggleTr = document.createElement('tr');
+                        toggleTr.id = 'today-divider';
+                        toggleTr.className = 'bg-yellow-100/50 border-y-2 border-yellow-400 cursor-pointer select-none';
+                        toggleTr.onclick = () => window.togglePastRows();
+                        const collapsed = state.pastRowsCollapsed !== false;
+                        toggleTr.innerHTML = `<td colspan="7" class="py-2.5 px-6 text-center shadow-sm"><span class="text-[11px] font-extrabold uppercase tracking-widest text-yellow-800 flex items-center justify-center"><i class="ph-fill ph-caret-${collapsed ? 'right' : 'down'} mr-1.5" id="past-toggle-icon"></i><i class="ph-fill ph-star mr-1.5"></i> Today & Future <span class="ml-2 text-yellow-600 font-bold" id="past-toggle-label">${pastCollapseLabel(collapsed, pastItemCount, pastClearedCount, pastUnclearedCount)}</span></span></td>`;
+                        tbody.appendChild(toggleTr);
+
+                        // Apply collapsed state — keep uncleared past rows visible
+                        if (collapsed) pastRows.forEach(r => { r.style.display = r.classList.contains('past-uncleared') ? '' : 'none'; });
                     }
                     dividerDrawn = true;
                 }
 
-                if (txn.type === 'deposit') { runningTotal += txn.amount; if (txn.status !== 'cleared') remainingImpact += txn.amount; } 
-                else { runningTotal -= txn.amount; if (txn.status !== 'cleared') remainingImpact -= txn.amount; }
+                // Cleared items are effectively $0 — they no longer impact the running total
+                if (txn.status !== 'cleared') {
+                    if (txn.type === 'deposit') { runningTotal += txn.amount; remainingDeposits += txn.amount; }
+                    else { runningTotal -= txn.amount; remainingWithdrawals += txn.amount; }
+                }
 
                 const isCleared = txn.status === 'cleared';
                 const isPast = txn.date < todayStr;
@@ -779,8 +1118,9 @@
                         rowBgClass = 'bg-rose-50/80 hover:bg-rose-100/80 border-l-4 border-rose-400';
                         warningIcon = `<i class="ph-fill ph-warning-circle text-rose-500 mr-1.5" title="Past Due / Uncleared"></i>`;
                         dateColor = 'text-rose-600 font-extrabold';
-                    } else rowBgClass = 'bg-slate-100/70 border-l-4 border-transparent';
-                } else rowBgClass = 'bg-white hover:bg-slate-50 border-l-4 border-transparent';
+                    } else rowBgClass = 'bg-slate-200/80 border-l-4 border-transparent';
+                } else if (isCleared) rowBgClass = 'bg-slate-200/70 border-l-4 border-transparent';
+                else rowBgClass = 'bg-white hover:bg-slate-50 border-l-4 border-transparent';
                 
                 const amountColor = txn.type === 'deposit' ? 'text-emerald-600' : 'text-slate-900';
                 const amountPrefix = txn.type === 'deposit' ? '+' : '';
@@ -813,20 +1153,46 @@
                         <span>$${runningTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
                     </td>
                     <td class="py-4 px-4 text-center">
-                        <div class="flex items-center justify-center space-x-1 opacity-0 group-hover:opacity-100 transition-all">
-                            <button onclick="openCommentModal('${txn.id}')" class="${commentBtnColor} bg-white hover:bg-brand-50 rounded-full p-2 shadow-sm transition-colors" title="Add/Edit Note"><i class="${txn.comment ? 'ph-fill' : 'ph-bold'} ph-chat-text text-lg"></i></button>
-                            <button onclick="deleteTransaction('${txn.id}')" class="text-slate-300 hover:text-rose-500 bg-white hover:bg-rose-50 rounded-full p-2 shadow-sm transition-colors"><i class="ph-bold ph-trash text-lg"></i></button>
+                        <div class="flex items-center justify-center space-x-1">
+                            <button onclick="openCommentModal('${txn.id}')" class="${commentBtnColor} bg-white hover:bg-brand-50 rounded-full p-1.5 shadow-sm transition-colors" title="Add/Edit Note"><i class="${txn.comment ? 'ph-fill' : 'ph-bold'} ph-chat-text"></i></button>
+                            ${isViewingPastMonth ? '' : `<button onclick="editTransaction('${txn.id}')" class="text-slate-300 hover:text-brand-500 bg-white hover:bg-brand-50 rounded-full p-1.5 shadow-sm transition-colors" title="Edit Entry"><i class="ph-bold ph-pencil-simple"></i></button>
+                            <button onclick="deleteTransaction('${txn.id}')" class="text-slate-300 hover:text-rose-500 bg-white hover:bg-rose-50 rounded-full p-1.5 shadow-sm transition-colors" title="Delete Entry"><i class="ph-bold ph-trash"></i></button>`}
                         </div>
                     </td>
                 `;
+                if (!dividerDrawn) { tr.classList.add('past-ledger-row'); if (!isCleared) tr.classList.add('past-uncleared'); pastRows.push(tr); }
                 tbody.appendChild(tr);
             });
 
-            document.getElementById('metric-remaining').innerText = `${remainingImpact >= 0 ? '+' : ''}$${remainingImpact.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-            const projectedEom = state.bankBalance + remainingImpact;
+            // If all items are past (no future items triggered the divider), add toggle at the end
+            if (!dividerDrawn && pastRows.length > 0) {
+                const collapsed = state.pastRowsCollapsed !== false;
+                const toggleTr = document.createElement('tr');
+                toggleTr.id = 'today-divider';
+                toggleTr.className = 'bg-yellow-100/50 border-y-2 border-yellow-400 cursor-pointer select-none';
+                toggleTr.onclick = () => window.togglePastRows();
+                toggleTr.innerHTML = `<td colspan="7" class="py-2.5 px-6 text-center shadow-sm"><span class="text-[11px] font-extrabold uppercase tracking-widest text-yellow-800 flex items-center justify-center"><i class="ph-fill ph-caret-${collapsed ? 'right' : 'down'} mr-1.5" id="past-toggle-icon"></i><i class="ph-fill ph-star mr-1.5"></i> Past Items <span class="ml-2 text-yellow-600 font-bold" id="past-toggle-label">${pastCollapseLabel(collapsed, pastItemCount, pastClearedCount, pastUnclearedCount)}</span></span></td>`;
+                tbody.insertBefore(toggleTr, tbody.firstChild);
+                if (collapsed) pastRows.forEach(r => { r.style.display = r.classList.contains('past-uncleared') ? '' : 'none'; });
+            }
+
+            // Update the 4 metric cards
+            document.getElementById('metric-withdrawals').innerText = `$${remainingWithdrawals.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            document.getElementById('metric-deposits').innerText = `$${remainingDeposits.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+            const delta = remainingDeposits - remainingWithdrawals;
+            const deltaEl = document.getElementById('metric-delta');
+            deltaEl.innerText = `${delta >= 0 ? '+' : ''}$${delta.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            deltaEl.className = delta < 0
+                ? 'text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-rose-600'
+                : 'text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-emerald-600';
+
+            const projectedEom = getBankBalanceForCurrentMonth() + delta;
             const projEl = document.getElementById('metric-projected');
             projEl.innerText = `$${projectedEom.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-            projEl.className = projectedEom < 0 ? "text-3xl font-extrabold mt-1 tracking-tight z-10 text-rose-400" : "text-3xl font-extrabold mt-1 tracking-tight z-10 text-emerald-400";
+            projEl.className = projectedEom < 0
+                ? 'text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-rose-400'
+                : 'text-xl lg:text-2xl font-extrabold tracking-tight z-10 text-emerald-400';
         }
 
         // --- RESTORED FEATURE: Template Grid Mechanics ---
@@ -846,7 +1212,7 @@
 
         window.toggleFrequencyUI = function() {
             const freq = document.getElementById('tpl-frequency').value;
-            ['monthly', 'weekly', 'custom'].forEach(f => document.getElementById(`tpl-ui-${f}`).classList.add('hide'));
+            ['monthly', 'biweekly', 'weekly', 'custom'].forEach(f => document.getElementById(`tpl-ui-${f}`).classList.add('hide'));
             document.getElementById(`tpl-ui-${freq}`).classList.remove('hide');
         }
 
@@ -885,7 +1251,11 @@
                 groups[groupName].forEach(tpl => {
                     const isExpense = tpl.type === 'withdrawal';
                     const catColor = getCatColorClass(tpl.type, tpl.category);
-                    let freqText = tpl.frequency === 'monthly' ? `Dates: ${tpl.monthlyDays.join(', ')}` : (tpl.frequency === 'weekly' ? `Weekly: ${tpl.weeklyDays.map(d => daysOfWeek.find(x => x.id === d).label).join(', ')}` : `Custom: ${tpl.customDates.join(', ')}`);
+                    let freqText = '';
+                    if (tpl.frequency === 'monthly') freqText = `Dates: ${tpl.monthlyDays.join(', ')}`;
+                    else if (tpl.frequency === 'biweekly') freqText = `Bi-Weekly from ${tpl.anchorDate || '?'}`;
+                    else if (tpl.frequency === 'weekly') freqText = `Weekly: ${tpl.weeklyDays.map(d => daysOfWeek.find(x => x.id === d).label).join(', ')}`;
+                    else freqText = `Custom: ${tpl.customDates.join(', ')}`;
 
                     const div = document.createElement('div');
                     div.className = 'bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden group';
@@ -908,7 +1278,7 @@
                     grid.appendChild(div);
                 });
             });
-            if(Object.keys(groups).length === 0) container.innerHTML = '<p class="text-slate-400 italic font-medium py-8">No rules created yet.</p>';
+            if(Object.keys(groups).length === 0) container.innerHTML = '<p class="text-slate-400 italic font-medium py-8">No recurring items created yet.</p>';
         }
 
         // --- RESTORED FEATURE: Dashboard Logic ---
@@ -926,6 +1296,7 @@
             if(cashflowChartObj) cashflowChartObj.destroy();
             if(categoryChartObj) categoryChartObj.destroy();
             if(balanceTrendChartObj) balanceTrendChartObj.destroy();
+            if(yearOverviewChartObj) yearOverviewChartObj.destroy();
 
             Chart.defaults.font.family = '"Plus Jakarta Sans", sans-serif';
 
@@ -941,6 +1312,104 @@
 
             const ctxCat = document.getElementById('categoryChart').getContext('2d');
             categoryChartObj = new Chart(ctxCat, { type: 'doughnut', data: { labels: Object.keys(expensesByCategory), datasets: [{ data: Object.values(expensesByCategory), backgroundColor: ['#4f46e5', '#ec4899', '#f59e0b', '#06b6d4', '#10b981', '#64748b'] }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right' } } } });
+
+            // --- Year Overview Chart (Jan–Dec) ---
+            const viewYear = state.currentDate.getFullYear();
+            const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const currentMonthIdx = REAL_CURRENT_DATE.getMonth();
+            const currentYear = REAL_CURRENT_DATE.getFullYear();
+            const eomData = []; const depData = []; const wdData = [];
+            const depColors = []; const wdColors = []; const eomPointColors = []; const eomPointRadius = [];
+
+            for (let m = 0; m < 12; m++) {
+                const mk = getMonthKey(viewYear, m);
+                const bankBal = resolveAutoCarryBalance(mk);
+                const monthTxns = state.transactions.filter(t => t.date.startsWith(mk));
+                let deposits = 0, withdrawals = 0, unclearedDep = 0, unclearedWd = 0;
+                monthTxns.forEach(t => {
+                    if (t.type === 'deposit') { deposits += t.amount; if (t.status !== 'cleared') unclearedDep += t.amount; }
+                    else { withdrawals += t.amount; if (t.status !== 'cleared') unclearedWd += t.amount; }
+                });
+                const projectedEom = bankBal + unclearedDep - unclearedWd;
+                eomData.push(monthTxns.length > 0 || state.monthlyBalances[mk] ? projectedEom : null);
+                depData.push(deposits || null);
+                wdData.push(withdrawals || null);
+
+                const isCurrent = (viewYear === currentYear && m === currentMonthIdx);
+                depColors.push(isCurrent ? '#059669' : '#10b981');
+                wdColors.push(isCurrent ? '#e11d48' : '#f43f5e');
+                eomPointColors.push(isCurrent ? '#4338ca' : '#6366f1');
+                eomPointRadius.push(isCurrent ? 7 : 4);
+            }
+
+            document.getElementById('yearOverviewLabel').textContent = viewYear;
+
+            const ctxYear = document.getElementById('yearOverviewChart').getContext('2d');
+            yearOverviewChartObj = new Chart(ctxYear, {
+                type: 'bar',
+                data: {
+                    labels: monthLabels,
+                    datasets: [
+                        {
+                            type: 'line', label: 'Projected EoM', data: eomData, borderColor: '#6366f1', borderWidth: 3,
+                            pointBackgroundColor: eomPointColors, pointRadius: eomPointRadius, pointBorderColor: '#fff', pointBorderWidth: 2,
+                            fill: false, tension: 0.3, yAxisID: 'y', order: 0, spanGaps: true
+                        },
+                        {
+                            label: 'Deposits', data: depData, backgroundColor: depColors,
+                            borderRadius: 6, yAxisID: 'y', order: 1, barPercentage: 0.7, categoryPercentage: 0.8
+                        },
+                        {
+                            label: 'Withdrawals', data: wdData, backgroundColor: wdColors,
+                            borderRadius: 6, yAxisID: 'y', order: 2, barPercentage: 0.7, categoryPercentage: 0.8
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { usePointStyle: true, padding: 20, font: { size: 11, weight: '600' } } },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.dataset.label}: $${(ctx.parsed.y || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}`,
+                                title: items => { const m = items[0].dataIndex; return (viewYear === currentYear && m === currentMonthIdx) ? `${items[0].label} (Current)` : items[0].label; }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            border: { display: false }, grid: { color: '#f1f5f9' },
+                            ticks: { callback: v => '$' + v.toLocaleString() }
+                        },
+                        x: {
+                            border: { display: false }, grid: { display: false },
+                            ticks: {
+                                font: function(ctx) {
+                                    return (viewYear === currentYear && ctx.index === currentMonthIdx)
+                                        ? { weight: '800', size: 13 } : { weight: '500', size: 11 };
+                                },
+                                color: function(ctx) {
+                                    return (viewYear === currentYear && ctx.index === currentMonthIdx) ? '#4f46e5' : '#64748b';
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'currentMonthHighlight',
+                    beforeDraw(chart) {
+                        if (viewYear !== currentYear) return;
+                        const { ctx: c, chartArea, scales: { x } } = chart;
+                        const barWidth = x.getPixelForValue(1) - x.getPixelForValue(0);
+                        const xPos = x.getPixelForValue(currentMonthIdx) - barWidth / 2;
+                        c.save();
+                        c.fillStyle = 'rgba(99, 102, 241, 0.06)';
+                        c.roundRect(xPos, chartArea.top, barWidth, chartArea.bottom - chartArea.top, 8);
+                        c.fill();
+                        c.restore();
+                    }
+                }]
+            });
         }
 
         // --- MISSING CRITICAL FUNCTIONS: Status, Delete, Edit, Comments ---
@@ -949,13 +1418,55 @@
         }
 
         window.deleteTransaction = async function(txnId) {
+            const txn = state.transactions.find(t => t.id === txnId);
+            if (txn && txn.date.substring(0, 7) < CURRENT_MONTH_KEY) { alert('Past month entries cannot be deleted.'); return; }
             if (!confirm('Delete this ledger entry?')) return;
             await deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId));
         }
 
-        window.deleteTemplate = async function(tplId) {
-            if (!confirm('Delete this recurring rule? Future months will no longer generate entries from it.')) return;
-            await deleteDoc(doc(db, 'users', currentUser.uid, 'templates', tplId));
+        window.deleteTemplate = function(tplId) {
+            if (!confirm('Delete this recurring item? This will also remove all uncleared entries it generated.')) return;
+            // Delete the template (fire-and-forget)
+            deleteDoc(doc(db, 'users', currentUser.uid, 'templates', tplId));
+            // Clean up unprocessed transactions from this template in current/future months only (fire-and-forget)
+            state.transactions.filter(t => t.templateId === tplId && t.status === 'unprocessed' && t.date.substring(0, 7) >= CURRENT_MONTH_KEY).forEach(t => {
+                deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', t.id));
+            });
+        }
+
+        window.refreshLedgerFromTemplates = function() {
+            const year = state.currentDate.getFullYear();
+            const month = state.currentDate.getMonth();
+            const viewKey = getMonthKey(year, month);
+            if (viewKey < CURRENT_MONTH_KEY) { alert('Past months are locked and cannot be refreshed.'); return; }
+
+            state.templates.forEach(tpl => {
+                const dates = getTemplateDatesForMonth(tpl, year, month);
+
+                // Update existing unprocessed entries with current template values
+                state.transactions
+                    .filter(t => t.templateId === tpl.id && t.status === 'unprocessed')
+                    .forEach(t => {
+                        if (dates.includes(t.date)) {
+                            setDoc(doc(db, 'users', currentUser.uid, 'transactions', t.id), {
+                                name: tpl.name, amount: tpl.amount, type: tpl.type,
+                                category: tpl.category, autoProcess: tpl.autoProcess || false
+                            }, { merge: true });
+                        }
+                    });
+
+                // Create any missing entries for this month
+                dates.forEach(dateStr => {
+                    if (!state.transactions.some(t => t.templateId === tpl.id && t.date === dateStr)) {
+                        const txnId = `tplgen_${tpl.id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
+                        setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), {
+                            id: txnId, templateId: tpl.id, date: dateStr, name: tpl.name,
+                            amount: tpl.amount, type: tpl.type, category: tpl.category,
+                            status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: ''
+                        });
+                    }
+                });
+            });
         }
 
         window.editTemplate = function(tplId) {
@@ -973,8 +1484,9 @@
             document.getElementById('tpl-modal-title').innerText = 'Edit Template';
             toggleFrequencyUI();
 
-            // Reset all checkboxes first
+            // Reset all checkboxes and biweekly anchor first
             document.querySelectorAll('.tpl-month-val, .tpl-day-val').forEach(cb => cb.checked = false);
+            document.getElementById('tpl-anchor-date').value = '';
             tempCustomDates = [];
 
             if (tpl.frequency === 'monthly' && tpl.monthlyDays) {
@@ -982,6 +1494,8 @@
                     const cb = document.querySelector(`.tpl-month-val[value="${day}"]`);
                     if (cb) cb.checked = true;
                 });
+            } else if (tpl.frequency === 'biweekly' && tpl.anchorDate) {
+                document.getElementById('tpl-anchor-date').value = tpl.anchorDate;
             } else if (tpl.frequency === 'weekly' && tpl.weeklyDays) {
                 tpl.weeklyDays.forEach(day => {
                     const cb = document.querySelector(`.tpl-day-val[value="${day}"]`);
@@ -1058,41 +1572,136 @@
             setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); }, 300);
         }
 
+        // Close topmost visible modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modals = ['washu', 'comment', 'transaction', 'template', 'settings'];
+                for (const type of modals) {
+                    const modal = document.getElementById(`modal-${type}`);
+                    if (modal && !modal.classList.contains('hidden')) { closeModal(type); break; }
+                }
+            }
+        });
+
         window.openTransactionModal = function() {
             document.getElementById('form-transaction').reset();
+            document.getElementById('txn-id').value = '';
             const year = state.currentDate.getFullYear(); const month = (state.currentDate.getMonth() + 1).toString().padStart(2, '0');
             document.getElementById('txn-date').value = `${year}-${month}-01`;
             updateCategoryOptions('txn-category', 'withdrawal');
             openModal('transaction');
         }
 
+        window.editTransaction = function(txnId) {
+            const txn = state.transactions.find(t => t.id === txnId);
+            if (!txn) return;
+            if (txn.date.substring(0, 7) < CURRENT_MONTH_KEY) { alert('Past month entries cannot be edited.'); return; }
+            document.getElementById('txn-id').value = txn.id;
+            document.getElementById('txn-date').value = txn.date;
+            document.getElementById('txn-name').value = txn.name;
+            document.getElementById('txn-amount').value = txn.amount;
+            document.getElementById('txn-type').value = txn.type;
+            updateCategoryOptions('txn-category', txn.type);
+            document.getElementById('txn-category').value = txn.category;
+            document.getElementById('txn-comment').value = txn.comment || '';
+            openModal('transaction');
+        }
+
         window.openTemplateModal = function() {
             document.getElementById('form-template').reset();
             document.getElementById('tpl-id').value = '';
+            document.getElementById('tpl-modal-title').innerText = 'New Template';
             tempCustomDates = []; renderDraftCustomDates();
             updateCategoryOptions('tpl-category', 'withdrawal');
             document.querySelectorAll('.tpl-month-val, .tpl-day-val').forEach(cb => cb.checked = false);
+            document.getElementById('tpl-anchor-date').value = '';
             toggleFrequencyUI();
             openModal('template');
         }
 
         window.handleTransactionSubmit = function(e) {
             e.preventDefault();
-            const id = 't_' + Date.now();
-            setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), { id, date: document.getElementById('txn-date').value, name: document.getElementById('txn-name').value, amount: parseFloat(document.getElementById('txn-amount').value), type: document.getElementById('txn-type').value, category: document.getElementById('txn-category').value, status: 'unprocessed', comment: document.getElementById('txn-comment').value });
+            const existingId = document.getElementById('txn-id').value;
+            const id = existingId || 't_' + Date.now();
+            const txnData = { id, date: document.getElementById('txn-date').value, name: document.getElementById('txn-name').value, amount: parseFloat(document.getElementById('txn-amount').value), type: document.getElementById('txn-type').value, category: document.getElementById('txn-category').value, comment: document.getElementById('txn-comment').value };
+            if (existingId) {
+                // Editing: merge to preserve templateId, autoProcess, status
+                setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), txnData, { merge: true });
+            } else {
+                txnData.status = 'unprocessed';
+                setDoc(doc(db, 'users', currentUser.uid, 'transactions', id), txnData);
+            }
             closeModal('transaction');
         }
 
-        window.handleTemplateSubmit = async function(e) {
+        window.handleTemplateSubmit = function(e) {
             e.preventDefault();
+            const isEdit = !!document.getElementById('tpl-id').value;
             const id = document.getElementById('tpl-id').value || 'tpl_' + Date.now();
             const freq = document.getElementById('tpl-frequency').value;
             let tpl = { id, name: document.getElementById('tpl-name').value, amount: parseFloat(document.getElementById('tpl-amount').value), type: document.getElementById('tpl-type').value, category: document.getElementById('tpl-category').value, frequency: freq, autoProcess: document.getElementById('tpl-autoprocess').checked, details: document.getElementById('tpl-details').value };
             if(freq === 'monthly') tpl.monthlyDays = Array.from(document.querySelectorAll('.tpl-month-val:checked')).map(cb => parseInt(cb.value));
+            else if(freq === 'biweekly') tpl.anchorDate = document.getElementById('tpl-anchor-date').value;
             else if(freq === 'weekly') tpl.weeklyDays = Array.from(document.querySelectorAll('.tpl-day-val:checked')).map(cb => parseInt(cb.value));
             else tpl.customDates = [...tempCustomDates];
 
-            await setDoc(doc(db, 'users', currentUser.uid, 'templates', id), tpl);
+            // Save template (fire-and-forget)
+            setDoc(doc(db, 'users', currentUser.uid, 'templates', id), tpl);
+
+            if (isEdit) {
+                // Sync unprocessed entries in current/future months only (fire-and-forget)
+                const unprocessed = state.transactions.filter(t => t.templateId === id && t.status === 'unprocessed' && t.date.substring(0, 7) >= CURRENT_MONTH_KEY);
+
+                // Build set of valid dates for current/future initialized months
+                const validDates = new Set();
+                state.initializedMonths.filter(mk => mk >= CURRENT_MONTH_KEY).forEach(mk => {
+                    const [y, m] = mk.split('-').map(Number);
+                    getTemplateDatesForMonth(tpl, y, m - 1).forEach(d => validDates.add(d));
+                });
+
+                // Update entries that still match a valid date, delete ones that don't
+                unprocessed.forEach(t => {
+                    if (validDates.has(t.date)) {
+                        // Update with new template values, preserve comment
+                        setDoc(doc(db, 'users', currentUser.uid, 'transactions', t.id), {
+                            name: tpl.name, amount: tpl.amount, type: tpl.type,
+                            category: tpl.category, autoProcess: tpl.autoProcess || false
+                        }, { merge: true });
+                    } else {
+                        // Date no longer in schedule — remove
+                        deleteDoc(doc(db, 'users', currentUser.uid, 'transactions', t.id));
+                    }
+                });
+
+                // Create entries for new dates not yet covered (current/future months only)
+                const existingDates = new Set(state.transactions.filter(t => t.templateId === id && t.date.substring(0, 7) >= CURRENT_MONTH_KEY).map(t => t.date));
+                validDates.forEach(dateStr => {
+                    if (!existingDates.has(dateStr)) {
+                        const txnId = `tplgen_${id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
+                        setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), {
+                            id: txnId, templateId: id, date: dateStr, name: tpl.name,
+                            amount: tpl.amount, type: tpl.type, category: tpl.category,
+                            status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: ''
+                        });
+                    }
+                });
+            } else {
+                // New template — create ledger entries for all initialized current/future months
+                state.initializedMonths.filter(mk => mk >= CURRENT_MONTH_KEY).forEach(mk => {
+                    const [y, m] = mk.split('-').map(Number);
+                    getTemplateDatesForMonth(tpl, y, m - 1).forEach(dateStr => {
+                        if (!state.transactions.some(t => t.templateId === id && t.date === dateStr)) {
+                            const txnId = `tplgen_${id}_${dateStr}_${Math.random().toString(36).substr(2, 5)}`;
+                            setDoc(doc(db, 'users', currentUser.uid, 'transactions', txnId), {
+                                id: txnId, templateId: id, date: dateStr, name: tpl.name,
+                                amount: tpl.amount, type: tpl.type, category: tpl.category,
+                                status: 'unprocessed', autoProcess: tpl.autoProcess || false, comment: ''
+                            });
+                        }
+                    });
+                });
+            }
+
             closeModal('template');
         }
 
@@ -1106,6 +1715,680 @@
             return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
 
+        // --- EXPORT / IMPORT ---
+        window.exportData = function() {
+            const backup = {
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                settings: {
+                    monthlyBalances: state.monthlyBalances,
+                    initializedMonths: state.initializedMonths
+                },
+                templates: state.templates,
+                transactions: state.transactions
+            };
+            const json = JSON.stringify(backup, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const dateStr = new Date().toISOString().split('T')[0];
+            a.href = url;
+            a.download = `buft-backup-${dateStr}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        window.importData = async function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const statusEl = document.getElementById('import-status');
+
+            try {
+                const text = await file.text();
+                const backup = JSON.parse(text);
+
+                // Validate structure
+                if (!backup.settings || !Array.isArray(backup.templates) || !Array.isArray(backup.transactions)) {
+                    statusEl.textContent = 'Invalid backup file format.';
+                    statusEl.className = 'mt-3 text-center text-sm font-bold text-rose-600';
+                    statusEl.classList.remove('hidden');
+                    event.target.value = '';
+                    return;
+                }
+
+                if (!confirm(`This will WIPE all existing data and restore from backup (${backup.exportedAt || 'unknown date'}).\n\n${backup.templates.length} templates, ${backup.transactions.length} transactions.\n\nContinue?`)) {
+                    event.target.value = '';
+                    return;
+                }
+
+                statusEl.textContent = 'Wiping existing data...';
+                statusEl.className = 'mt-3 text-center text-sm font-bold text-amber-600';
+                statusEl.classList.remove('hidden');
+
+                const uid = currentUser.uid;
+
+                // Wipe existing transactions
+                const txnSnap = await getDocs(collection(db, 'users', uid, 'transactions'));
+                let wipeBatch = writeBatch(db);
+                let batchCount = 0;
+                for (const d of txnSnap.docs) {
+                    wipeBatch.delete(d.ref);
+                    batchCount++;
+                    if (batchCount >= 400) { await wipeBatch.commit(); wipeBatch = writeBatch(db); batchCount = 0; }
+                }
+
+                // Wipe existing templates
+                const tplSnap = await getDocs(collection(db, 'users', uid, 'templates'));
+                for (const d of tplSnap.docs) {
+                    wipeBatch.delete(d.ref);
+                    batchCount++;
+                    if (batchCount >= 400) { await wipeBatch.commit(); wipeBatch = writeBatch(db); batchCount = 0; }
+                }
+                if (batchCount > 0) await wipeBatch.commit();
+
+                statusEl.textContent = 'Restoring backup...';
+
+                // Write settings
+                // Support importing old (bankBalance) or new (monthlyBalances) format
+                const importedBalances = backup.settings.monthlyBalances || (typeof backup.settings.bankBalance === 'number' ? { [getMonthKey(REAL_CURRENT_DATE.getFullYear(), REAL_CURRENT_DATE.getMonth())]: { amount: backup.settings.bankBalance, autoCarry: false } } : {});
+                await setDoc(doc(db, 'users', uid, 'settings', 'main'), {
+                    monthlyBalances: importedBalances,
+                    initializedMonths: backup.settings.initializedMonths || [],
+                    hasAcceptedTerms: true
+                });
+
+                // Write templates in batches
+                let restoreBatch = writeBatch(db);
+                batchCount = 0;
+                for (const tpl of backup.templates) {
+                    restoreBatch.set(doc(db, 'users', uid, 'templates', tpl.id), tpl);
+                    batchCount++;
+                    if (batchCount >= 400) { await restoreBatch.commit(); restoreBatch = writeBatch(db); batchCount = 0; }
+                }
+
+                // Write transactions in batches
+                for (const txn of backup.transactions) {
+                    restoreBatch.set(doc(db, 'users', uid, 'transactions', txn.id), txn);
+                    batchCount++;
+                    if (batchCount >= 400) { await restoreBatch.commit(); restoreBatch = writeBatch(db); batchCount = 0; }
+                }
+                if (batchCount > 0) await restoreBatch.commit();
+
+                statusEl.textContent = 'Restore complete! Reloading...';
+                statusEl.className = 'mt-3 text-center text-sm font-bold text-emerald-600';
+                setTimeout(() => location.reload(), 1500);
+
+            } catch (err) {
+                console.error('Import error:', err);
+                statusEl.textContent = 'Import failed: ' + err.message;
+                statusEl.className = 'mt-3 text-center text-sm font-bold text-rose-600';
+                statusEl.classList.remove('hidden');
+            }
+            event.target.value = '';
+        }
+
+        // --- ASK WASHU: AI Chat Engine (Multi-Provider) ---
+        let washuConversation = []; // Multi-turn history: [{role: 'user'|'assistant', content: '...'}]
+        let washuIsStreaming = false;
+        let washuAbortController = null;
+        let washuLastApiTime = null;
+        let washuTimerInterval = null;
+        let washuLastApiLabel = '';
+
+        // Provider config
+        const WASHU_PROVIDER_DEFAULTS = {
+            'gemini': { endpoint: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-2.0-flash', keyRequired: true, keyHint: 'Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" class="font-bold text-brand-600 hover:underline">aistudio.google.com</a>' },
+            'openai-compatible': { endpoint: 'http://localhost:11434', model: 'llama3', keyRequired: false, keyHint: 'Optional — only needed for cloud providers like OpenRouter.' }
+        };
+        let washuConfig = { provider: '', endpoint: '', model: '', apiKey: '' };
+
+        function startWashuTimer(label) {
+            washuLastApiTime = Date.now();
+            washuLastApiLabel = label;
+            const timerEl = document.getElementById('washu-api-timer');
+            const textEl = document.getElementById('washu-timer-text');
+            timerEl.classList.remove('hidden');
+            updateWashuTimerDisplay();
+            if (washuTimerInterval) clearInterval(washuTimerInterval);
+            washuTimerInterval = setInterval(updateWashuTimerDisplay, 1000);
+        }
+
+        function updateWashuTimerDisplay() {
+            if (!washuLastApiTime) return;
+            const textEl = document.getElementById('washu-timer-text');
+            const elapsed = Math.floor((Date.now() - washuLastApiTime) / 1000);
+            let timeStr;
+            if (elapsed < 60) timeStr = `${elapsed}s`;
+            else if (elapsed < 3600) timeStr = `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+            else timeStr = `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`;
+            textEl.textContent = `${washuLastApiLabel} ${timeStr} ago`;
+        }
+
+        function getWashuSystemPrompt() {
+            return `You are **Washu**, the Bienvenu Family AI Persona, created by Paul Bienvenu. Your personality is modeled after Washu Hakubi from the Tenchi Muyo series — you're a witty, self-proclaimed greatest genius in the universe. You're confident, playful, and occasionally smug, but always helpful and insightful. You sprinkle in light humor and clever observations. You refer to yourself as Washu.
+
+You are embedded inside BUFT (BakaNeko's Ultimate Finance Tool), a personal finance ledger app. Your job is to analyze the user's financial data and answer their questions with sharp, actionable insights.
+
+**Formatting rules:**
+- Use **bold** for emphasis, numbers, and key terms
+- Use bullet points for lists
+- Keep responses concise but thorough
+- Use dollar amounts with two decimal places
+- When comparing months, clearly label each month
+
+**Important financial concepts in BUFT:**
+- "Cleared" items have already hit the bank account and do NOT affect the running total or projections (they are already reflected in the bank balance)
+- "Unprocessed" and "Pending" items are still outstanding — they DO affect the projected end-of-month balance
+- "Bank Balance" is the starting balance for the month (what's actually in the bank)
+- "Projected EoM" = Bank Balance + all non-cleared deposits - all non-cleared withdrawals
+- Templates are recurring items that auto-generate ledger entries each month
+- Auto-process items automatically clear when their date passes
+
+Here is the user's complete BUFT financial data:
+
+${buildWashuContext()}`;
+        }
+
+        function buildWashuContext() {
+            const lines = [];
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+            // Current viewing context
+            lines.push(`**Today's Date:** ${REAL_CURRENT_DATE.toISOString().split('T')[0]}`);
+            lines.push(`**Currently Viewing:** ${monthNames[state.currentDate.getMonth()]} ${state.currentDate.getFullYear()}`);
+            lines.push('');
+
+            // All months with data
+            const allMonthKeys = new Set();
+            state.transactions.forEach(t => {
+                const mk = t.date.substring(0, 7);
+                allMonthKeys.add(mk);
+            });
+            Object.keys(state.monthlyBalances).forEach(k => allMonthKeys.add(k));
+            const sortedMonths = [...allMonthKeys].sort();
+
+            sortedMonths.forEach(mk => {
+                const [year, month] = mk.split('-').map(Number);
+                const monthName = monthNames[month - 1];
+                const entry = getMonthBalanceEntry(mk);
+                const bankBal = resolveAutoCarryBalance(mk);
+                const monthTxns = state.transactions.filter(t => t.date.startsWith(mk)).sort((a, b) => a.date.localeCompare(b.date));
+
+                if (monthTxns.length === 0 && !state.monthlyBalances[mk]) return;
+
+                lines.push(`--- ${monthName} ${year} ---`);
+                lines.push(`Bank Balance: $${bankBal.toFixed(2)}${entry.autoCarry ? ' (auto-carried from previous month)' : ''}`);
+
+                let unclearedW = 0, unclearedD = 0, clearedW = 0, clearedD = 0;
+                monthTxns.forEach(t => {
+                    if (t.status === 'cleared') {
+                        if (t.type === 'withdrawal') clearedW += t.amount;
+                        else clearedD += t.amount;
+                    } else {
+                        if (t.type === 'withdrawal') unclearedW += t.amount;
+                        else unclearedD += t.amount;
+                    }
+                });
+
+                lines.push(`Outstanding Withdrawals: $${unclearedW.toFixed(2)} | Outstanding Deposits: $${unclearedD.toFixed(2)}`);
+                lines.push(`Already Cleared: $${clearedW.toFixed(2)} withdrawn, $${clearedD.toFixed(2)} deposited`);
+                lines.push(`Projected EoM: $${(bankBal + unclearedD - unclearedW).toFixed(2)}`);
+                lines.push('');
+                lines.push('Transactions:');
+
+                monthTxns.forEach(t => {
+                    const sign = t.type === 'deposit' ? '+' : '-';
+                    const status = t.status === 'cleared' ? '[CLEARED]' : t.status === 'pending' ? '[PENDING]' : '[UNCLEARED]';
+                    const auto = t.autoProcess ? ' (auto)' : '';
+                    const comment = t.comment ? ` — "${t.comment}"` : '';
+                    lines.push(`  ${t.date} | ${sign}$${t.amount.toFixed(2)} | ${t.name} | ${t.category} | ${status}${auto}${comment}`);
+                });
+                lines.push('');
+            });
+
+            // Templates
+            if (state.templates.length > 0) {
+                lines.push('--- RECURRING TEMPLATES ---');
+                state.templates.forEach(tpl => {
+                    const sign = tpl.type === 'deposit' ? '+' : '-';
+                    let freq = tpl.frequency;
+                    if (tpl.frequency === 'monthly') freq = `Monthly on days: ${tpl.monthlyDays?.join(', ')}`;
+                    else if (tpl.frequency === 'biweekly') freq = `Bi-weekly from ${tpl.anchorDate}`;
+                    else if (tpl.frequency === 'weekly') freq = `Weekly on days: ${tpl.weeklyDays?.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]).join(', ')}`;
+                    else if (tpl.frequency === 'custom') freq = `Custom dates: ${tpl.customDates?.join(', ')}`;
+                    const auto = tpl.autoProcess ? ' [AUTO-PROCESS]' : '';
+                    lines.push(`  ${sign}$${tpl.amount.toFixed(2)} | ${tpl.name} | ${tpl.category} | ${freq}${auto}`);
+                });
+            }
+
+            return lines.join('\n');
+        }
+
+        // --- Washu Provider UI helpers ---
+        window.onWashuProviderChange = function() {
+            const provider = document.getElementById('settings-washu-provider').value;
+            const defaults = WASHU_PROVIDER_DEFAULTS[provider];
+            document.getElementById('settings-washu-endpoint').value = defaults.endpoint;
+            document.getElementById('settings-washu-endpoint').placeholder = defaults.endpoint;
+            document.getElementById('settings-washu-model').value = defaults.model;
+            document.getElementById('settings-washu-model').placeholder = defaults.model;
+            document.getElementById('washu-key-required').textContent = defaults.keyRequired ? '(required)' : '(optional)';
+            document.getElementById('washu-key-required').className = defaults.keyRequired ? 'ml-1.5 text-rose-400' : 'ml-1.5 text-slate-400';
+            document.getElementById('washu-key-hint').innerHTML = defaults.keyHint;
+            document.getElementById('settings-washu-key').value = '';
+            document.getElementById('settings-washu-key').placeholder = defaults.keyRequired ? 'AIza...' : 'sk-... (optional)';
+            // Mixed-content warning
+            checkWashuMixedContent();
+        }
+
+        function checkWashuMixedContent() {
+            const endpoint = document.getElementById('settings-washu-endpoint').value.trim();
+            const warn = document.getElementById('washu-mixed-content-warning');
+            if (window.location.protocol === 'https:' && endpoint.startsWith('http://')) {
+                warn.classList.remove('hidden');
+            } else {
+                warn.classList.add('hidden');
+            }
+        }
+
+        // --- Washu Provider save/load ---
+        window.saveWashuProvider = function() {
+            const provider = document.getElementById('settings-washu-provider').value;
+            const endpoint = document.getElementById('settings-washu-endpoint').value.trim() || WASHU_PROVIDER_DEFAULTS[provider].endpoint;
+            const model = document.getElementById('settings-washu-model').value.trim() || WASHU_PROVIDER_DEFAULTS[provider].model;
+            const apiKey = document.getElementById('settings-washu-key').value.trim();
+            const defaults = WASHU_PROVIDER_DEFAULTS[provider];
+            const statusEl = document.getElementById('washu-provider-status');
+
+            // Validate: key required for Gemini
+            if (defaults.keyRequired && !apiKey && !washuConfig.apiKey) {
+                statusEl.textContent = 'API key is required for this provider.';
+                statusEl.className = 'text-[11px] font-bold mt-2 text-rose-600';
+                return;
+            }
+
+            washuConfig.provider = provider;
+            washuConfig.endpoint = endpoint;
+            washuConfig.model = model;
+            if (apiKey) washuConfig.apiKey = apiKey; // don't overwrite existing key if field is masked
+
+            setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), {
+                washuProvider: provider,
+                washuEndpoint: endpoint,
+                washuModel: model,
+                washuApiKey: washuConfig.apiKey
+            }, { merge: true });
+
+            statusEl.textContent = 'Saved! Ask Washu is ready.';
+            statusEl.className = 'text-[11px] font-bold mt-2 text-emerald-600';
+            document.getElementById('btn-ask-washu').classList.remove('hide');
+        }
+
+        function loadWashuProviderFromSettings(data) {
+            if (!data) return;
+            // Backward compat: migrate old geminiApiKey-only config
+            if (data.geminiApiKey && !data.washuProvider) {
+                washuConfig.provider = 'gemini';
+                washuConfig.endpoint = WASHU_PROVIDER_DEFAULTS['gemini'].endpoint;
+                washuConfig.model = WASHU_PROVIDER_DEFAULTS['gemini'].model;
+                washuConfig.apiKey = data.geminiApiKey;
+            } else if (data.washuProvider) {
+                washuConfig.provider = data.washuProvider;
+                washuConfig.endpoint = data.washuEndpoint || WASHU_PROVIDER_DEFAULTS[data.washuProvider]?.endpoint || '';
+                washuConfig.model = data.washuModel || WASHU_PROVIDER_DEFAULTS[data.washuProvider]?.model || '';
+                washuConfig.apiKey = data.washuApiKey || '';
+            } else {
+                return; // No AI config at all
+            }
+
+            // Populate UI fields
+            document.getElementById('settings-washu-provider').value = washuConfig.provider;
+            document.getElementById('settings-washu-endpoint').value = washuConfig.endpoint;
+            document.getElementById('settings-washu-model').value = washuConfig.model;
+            if (washuConfig.apiKey) {
+                document.getElementById('settings-washu-key').value = '••••••••••••';
+            }
+            const defaults = WASHU_PROVIDER_DEFAULTS[washuConfig.provider];
+            if (defaults) {
+                document.getElementById('washu-key-required').textContent = defaults.keyRequired ? '(required)' : '(optional)';
+                document.getElementById('washu-key-required').className = defaults.keyRequired ? 'ml-1.5 text-rose-400' : 'ml-1.5 text-slate-400';
+                document.getElementById('washu-key-hint').innerHTML = defaults.keyHint;
+                document.getElementById('settings-washu-key').placeholder = defaults.keyRequired ? 'AIza...' : 'sk-... (optional)';
+            }
+
+            document.getElementById('btn-ask-washu').classList.remove('hide');
+            const statusEl = document.getElementById('washu-provider-status');
+            statusEl.textContent = `${washuConfig.provider === 'gemini' ? 'Gemini' : 'OpenAI-compatible'} provider loaded.`;
+            statusEl.className = 'text-[11px] font-bold mt-2 text-emerald-600';
+        }
+
+        // --- Test Connection ---
+        window.testWashuConnection = async function() {
+            const provider = document.getElementById('settings-washu-provider').value;
+            const endpoint = document.getElementById('settings-washu-endpoint').value.trim() || WASHU_PROVIDER_DEFAULTS[provider].endpoint;
+            const model = document.getElementById('settings-washu-model').value.trim() || WASHU_PROVIDER_DEFAULTS[provider].model;
+            let apiKey = document.getElementById('settings-washu-key').value.trim();
+            if (apiKey === '••••••••••••') apiKey = washuConfig.apiKey; // use saved key if field is masked
+            const statusEl = document.getElementById('washu-provider-status');
+            statusEl.textContent = 'Testing connection...';
+            statusEl.className = 'text-[11px] font-bold mt-2 text-slate-500';
+
+            try {
+                const req = buildProviderRequest(provider, endpoint, model, apiKey, 'Reply with just the word OK.', [{ role: 'user', content: 'Say OK' }]);
+                const resp = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body), signal: AbortSignal.timeout(15000) });
+                if (!resp.ok) {
+                    const errText = await resp.text();
+                    let msg = '';
+                    try { msg = JSON.parse(errText)?.error?.message || ''; } catch(_) {}
+                    throw new Error(`HTTP ${resp.status}: ${msg || errText.substring(0, 200)}`);
+                }
+                const result = await resp.json();
+                const text = parseProviderResponse(provider, result);
+                if (!text) throw new Error('Empty response — check model name.');
+                statusEl.textContent = `Connected! Model responded: "${text.substring(0, 60)}"`;
+                statusEl.className = 'text-[11px] font-bold mt-2 text-emerald-600';
+            } catch (err) {
+                statusEl.textContent = `Connection failed: ${err.message}`;
+                statusEl.className = 'text-[11px] font-bold mt-2 text-rose-600';
+            }
+        }
+
+        // --- Provider Translation Layer ---
+        function buildProviderRequest(provider, endpoint, model, apiKey, systemPrompt, conversation) {
+            if (provider === 'gemini') {
+                // Gemini format
+                const geminiContents = conversation.map(m => ({
+                    role: m.role === 'assistant' ? 'model' : m.role,
+                    parts: [{ text: m.content }]
+                }));
+                return {
+                    url: `${endpoint}/models/${model}:generateContent?key=${apiKey}`,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: {
+                        system_instruction: { parts: [{ text: systemPrompt }] },
+                        contents: geminiContents,
+                        generationConfig: { temperature: 0.8, topP: 0.95, maxOutputTokens: 2048 }
+                    }
+                };
+            } else {
+                // OpenAI-compatible format (Ollama, LM Studio, OpenRouter, etc.)
+                const messages = [
+                    { role: 'system', content: systemPrompt },
+                    ...conversation.map(m => ({ role: m.role, content: m.content }))
+                ];
+                const headers = { 'Content-Type': 'application/json' };
+                if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+                // Normalize endpoint: strip trailing slash, add /v1/chat/completions if not present
+                let url = endpoint.replace(/\/+$/, '');
+                if (!url.includes('/v1/chat/completions')) url += '/v1/chat/completions';
+                return {
+                    url,
+                    headers,
+                    body: { model, messages, temperature: 0.8, max_tokens: 2048 }
+                };
+            }
+        }
+
+        function parseProviderResponse(provider, result) {
+            if (provider === 'gemini') {
+                return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            } else {
+                return result.choices?.[0]?.message?.content || '';
+            }
+        }
+
+        function getProviderBlockReason(provider, result) {
+            if (provider === 'gemini') {
+                return result.candidates?.[0]?.finishReason || '';
+            } else {
+                return result.choices?.[0]?.finish_reason || '';
+            }
+        }
+
+        window.openWashuChat = function() {
+            if (!washuConfig.provider) {
+                alert('Please configure an AI provider in Settings first.');
+                openModal('settings');
+                return;
+            }
+            openModal('washu');
+            document.getElementById('washu-input').focus();
+            // Scroll to bottom
+            const msgArea = document.getElementById('washu-messages');
+            msgArea.scrollTop = msgArea.scrollHeight;
+        }
+
+        window.clearWashuChat = function() {
+            washuConversation = [];
+            const msgArea = document.getElementById('washu-messages');
+            msgArea.innerHTML = `
+                <div class="flex gap-3">
+                    <div class="bg-gradient-to-br from-fuchsia-500 to-purple-600 w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md">
+                        <i class="ph-fill ph-brain text-white text-sm"></i>
+                    </div>
+                    <div class="bg-slate-50 rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] border border-slate-100">
+                        <p class="text-sm text-slate-700 leading-relaxed">Fresh start! What would you like to know? My genius is at your disposal. 😏</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 ml-11">
+                    <button onclick="askWashuQuick('What\\'s my biggest expense this month?')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Biggest expense?</button>
+                    <button onclick="askWashuQuick('Am I on track to end the month positive?')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Am I on track?</button>
+                    <button onclick="askWashuQuick('Summarize my financial situation across all months.')" class="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-xs font-bold border border-fuchsia-200 transition-colors">Full summary</button>
+                </div>`;
+        }
+
+        window.cancelWashuRequest = function() {
+            if (washuAbortController) {
+                washuAbortController.abort();
+                washuAbortController = null;
+            }
+        }
+
+        window.askWashuQuick = function(question) {
+            document.getElementById('washu-input').value = question;
+            handleWashuSubmit(new Event('submit', { cancelable: true }));
+        }
+
+        window.handleWashuSubmit = async function(e) {
+            e.preventDefault();
+            const input = document.getElementById('washu-input');
+            const question = input.value.trim();
+            if (!question || washuIsStreaming) return;
+            input.value = '';
+
+            const msgArea = document.getElementById('washu-messages');
+
+            // Remove quick-action buttons if present
+            const quickBtns = msgArea.querySelectorAll('.flex.flex-wrap.gap-2');
+            quickBtns.forEach(el => el.remove());
+
+            // Add user bubble
+            const userDiv = document.createElement('div');
+            userDiv.className = 'flex gap-3 justify-end';
+            userDiv.innerHTML = `
+                <div class="bg-gradient-to-r from-brand-500 to-brand-600 text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] shadow-sm">
+                    <p class="text-sm leading-relaxed">${escapeHtml(question)}</p>
+                </div>`;
+            msgArea.appendChild(userDiv);
+
+            // Add Washu response placeholder
+            const washuDiv = document.createElement('div');
+            washuDiv.className = 'flex gap-3';
+            washuDiv.innerHTML = `
+                <div class="bg-gradient-to-br from-fuchsia-500 to-purple-600 w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md">
+                    <i class="ph-fill ph-brain text-white text-sm"></i>
+                </div>
+                <div class="bg-slate-50 rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] border border-slate-100 washu-msg">
+                    <p class="text-sm text-slate-500 leading-relaxed italic" id="washu-streaming-target"><i class="ph-bold ph-spinner washu-spinner mr-1.5"></i>Washu is thinking...</p>
+                    <button onclick="cancelWashuRequest()" class="text-[10px] font-bold text-slate-400 hover:text-rose-500 mt-1.5 transition-colors" id="washu-cancel-btn">Cancel</button>
+                </div>`;
+            msgArea.appendChild(washuDiv);
+            msgArea.scrollTop = msgArea.scrollHeight;
+
+            // Build conversation payload (neutral format)
+            washuConversation.push({ role: 'user', content: question });
+
+            await sendWashuRequest();
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function simpleMarkdown(text) {
+            // Bold: **text**
+            text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            // Inline code: `text`
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Bullet points: lines starting with - or *
+            text = text.replace(/^[\-\*]\s+(.+)$/gm, '<li>$1</li>');
+            text = text.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+            // Numbered lists: lines starting with 1. 2. etc
+            text = text.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+            // Paragraphs (double newline)
+            text = text.replace(/\n\n/g, '</p><p class="text-sm text-slate-700 leading-relaxed">');
+            // Single newlines to <br>
+            text = text.replace(/\n/g, '<br>');
+            return text;
+        }
+
+        async function sendWashuRequest() {
+            washuIsStreaming = true;
+            const sendBtn = document.getElementById('washu-send-btn');
+            const input = document.getElementById('washu-input');
+            sendBtn.disabled = true;
+            input.disabled = true;
+            sendBtn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i>';
+
+            const target = document.getElementById('washu-streaming-target');
+            const msgArea = document.getElementById('washu-messages');
+            let fullText = '';
+            let payloadJson = '';
+            let systemPromptLen = 0;
+            let convoLen = 0;
+            const { provider, endpoint, model, apiKey } = washuConfig;
+
+            try {
+                const systemPrompt = getWashuSystemPrompt();
+                const req = buildProviderRequest(provider, endpoint, model, apiKey, systemPrompt, washuConversation);
+
+                // AbortController with 60-second timeout that covers the ENTIRE request lifecycle
+                const controller = new AbortController();
+                washuAbortController = controller;
+                const timeout = setTimeout(() => controller.abort(), 60000);
+                startWashuTimer('Sent');
+                payloadJson = JSON.stringify(req.body);
+                systemPromptLen = systemPrompt.length;
+                convoLen = JSON.stringify(washuConversation).length;
+                const approxTokens = Math.ceil(payloadJson.length / 4);
+                console.log(`Washu [${provider}] payload: ${payloadJson.length} chars (~${approxTokens} tokens), system prompt: ${systemPromptLen} chars, conversation: ${convoLen} chars`);
+
+                const fetchOpts = {
+                    method: 'POST',
+                    headers: req.headers,
+                    body: payloadJson,
+                    signal: controller.signal
+                };
+
+                // Retry logic for 429 rate limits (up to 3 attempts with backoff)
+                // Don't retry on quota exhaustion — only on temporary per-minute rate limits
+                let response;
+                const maxRetries = 3;
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                    response = await fetch(req.url, fetchOpts);
+                    if (response.status !== 429 || attempt === maxRetries) break;
+                    // Peek at the error to see if it's quota exhaustion (don't retry those)
+                    const peekBody = await response.clone().text();
+                    if (peekBody.includes('exceeded') || peekBody.includes('quota') || peekBody.includes('billing')) break;
+                    const waitSec = attempt * 3;
+                    console.log(`Washu 429 rate-limited, retrying in ${waitSec}s (attempt ${attempt}/${maxRetries})`);
+                    if (target) target.innerHTML = `<i class="ph-bold ph-spinner washu-spinner mr-1.5"></i>Rate-limited — retrying in ${waitSec}s...`;
+                    await new Promise(r => setTimeout(r, waitSec * 1000));
+                }
+
+                if (!response.ok) {
+                    clearTimeout(timeout);
+                    const errBody = await response.text();
+                    console.error('Washu API raw error:', response.status, errBody);
+                    let apiMsg = '';
+                    try {
+                        const errJson = JSON.parse(errBody);
+                        apiMsg = errJson?.error?.message || '';
+                    } catch(_) {}
+                    throw new Error(`API error ${response.status}: ${apiMsg || errBody.substring(0, 500)}`);
+                }
+
+                const result = await response.json();
+                clearTimeout(timeout);
+                fullText = parseProviderResponse(provider, result);
+
+                if (!fullText) {
+                    const blockReason = getProviderBlockReason(provider, result);
+                    throw new Error(blockReason ? `Response blocked (${blockReason})` : 'Empty response from AI provider');
+                }
+
+                // Finalize — reset styling and render response
+                startWashuTimer('Reply');
+                target.className = 'text-sm text-slate-700 leading-relaxed';
+                target.innerHTML = simpleMarkdown(fullText);
+                msgArea.scrollTop = msgArea.scrollHeight;
+
+                // Save to conversation history (neutral format)
+                washuConversation.push({ role: 'assistant', content: fullText });
+
+            } catch (err) {
+                console.error('Washu API error:', err);
+                startWashuTimer('Error');
+                target.className = 'text-sm leading-relaxed';
+
+                let errorMsg = 'Hmm, even a genius hits a snag sometimes. ';
+                if (err.name === 'AbortError') {
+                    errorMsg += 'Request was cancelled or timed out. Try again in a moment.';
+                } else if (err.message.includes('API error 400')) {
+                    const detail = err.message.replace('API error 400: ', '').substring(0, 300);
+                    errorMsg += `Bad request — ${detail}`;
+                } else if (err.message.includes('API error 401') || err.message.includes('API error 403')) {
+                    errorMsg += 'Your API key seems invalid or unauthorized. Double-check it in Settings.';
+                } else if (err.message.includes('API error 429')) {
+                    const detail429 = err.message.replace('API error 429: ', '');
+                    if (detail429.includes('exceeded') || detail429.includes('quota') || detail429.includes('billing')) {
+                        errorMsg += 'Your free-tier daily quota with Google is used up. It resets at midnight Pacific time. You can also add billing at ai.google.dev to remove limits.';
+                    } else {
+                        errorMsg += `Temporary rate limit — wait a minute and try again. Provider says: "${detail429.substring(0, 200)}"`;
+                    }
+                } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+                    errorMsg += `Could not reach the AI endpoint (${endpoint}). Check that the URL is correct and the service is running.`;
+                } else {
+                    errorMsg += err.message;
+                }
+
+                // Show diagnostics so we can debug persistent failures
+                const diagLine = payloadJson
+                    ? `<br><span class="text-xs text-slate-500 mt-2 block font-mono">provider: ${provider} | model: ${model} | payload: ${payloadJson.length} chars (~${Math.ceil(payloadJson.length / 4)} tokens) | prompt: ${systemPromptLen} chars | convo: ${convoLen} chars</span>`
+                    : '';
+
+                target.innerHTML = `<span class="text-rose-600">${errorMsg}</span>${diagLine}`;
+                // Remove the failed message from conversation
+                washuConversation.pop();
+            } finally {
+                // Remove the ID so future messages don't collide with this element
+                if (target) target.removeAttribute('id');
+                // Hide cancel button
+                const cancelBtn = document.getElementById('washu-cancel-btn');
+                if (cancelBtn) cancelBtn.remove();
+                washuAbortController = null;
+                washuIsStreaming = false;
+                sendBtn.disabled = false;
+                input.disabled = false;
+                sendBtn.innerHTML = '<i class="ph-bold ph-paper-plane-tilt"></i>';
+                input.focus();
+            }
+        }
+
         // --- INIT: Must run AFTER all window.xxx assignments above ---
         setupWeeklyCheckboxes();
         setupMonthlyGrid();
@@ -1114,4 +2397,3 @@
     </script>
 </body>
 </html>
-
