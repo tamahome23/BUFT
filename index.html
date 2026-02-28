@@ -853,19 +853,29 @@
 
         window.togglePastRows = function() {
             state.pastRowsCollapsed = !state.pastRowsCollapsed;
-            const rows = document.querySelectorAll('.past-ledger-row');
+            const allRows = document.querySelectorAll('.past-ledger-row');
+            const unclearedRows = document.querySelectorAll('.past-ledger-row.past-uncleared');
+            const clearedCount = allRows.length - unclearedRows.length;
             const icon = document.getElementById('past-toggle-icon');
             const label = document.getElementById('past-toggle-label');
-            const count = rows.length;
             if (state.pastRowsCollapsed) {
-                rows.forEach(r => r.style.display = 'none');
+                allRows.forEach(r => { r.style.display = r.classList.contains('past-uncleared') ? '' : 'none'; });
                 if (icon) icon.className = 'ph-fill ph-caret-right mr-1.5';
-                if (label) label.textContent = `(${count} past item${count !== 1 ? 's' : ''} hidden)`;
+                if (label) label.textContent = pastCollapseLabel(true, allRows.length, clearedCount, unclearedRows.length);
             } else {
-                rows.forEach(r => r.style.display = '');
+                allRows.forEach(r => r.style.display = '');
                 if (icon) icon.className = 'ph-fill ph-caret-down mr-1.5';
-                if (label) label.textContent = `(${count} past item${count !== 1 ? 's' : ''} shown)`;
+                if (label) label.textContent = pastCollapseLabel(false, allRows.length, clearedCount, unclearedRows.length);
             }
+        }
+
+        function pastCollapseLabel(collapsed, total, cleared, uncleared) {
+            if (collapsed) {
+                let txt = `(${cleared} cleared hidden`;
+                if (uncleared > 0) txt += ` · ${uncleared} uncleared`;
+                return txt + ')';
+            }
+            return `(${total} past item${total !== 1 ? 's' : ''} shown)`;
         }
 
         window.scrollToTodayDivider = function() {
@@ -1071,6 +1081,8 @@
             let dividerDrawn = false;
             const pastRows = [];
             const pastItemCount = txns.filter(t => t.date < todayStr).length;
+            const pastUnclearedCount = txns.filter(t => t.date < todayStr && t.status !== 'cleared').length;
+            const pastClearedCount = pastItemCount - pastUnclearedCount;
 
             txns.forEach((txn) => {
                 if (!dividerDrawn && txn.date >= todayStr) {
@@ -1081,11 +1093,11 @@
                         toggleTr.className = 'bg-yellow-100/50 border-y-2 border-yellow-400 cursor-pointer select-none';
                         toggleTr.onclick = () => window.togglePastRows();
                         const collapsed = state.pastRowsCollapsed !== false;
-                        toggleTr.innerHTML = `<td colspan="7" class="py-2.5 px-6 text-center shadow-sm"><span class="text-[11px] font-extrabold uppercase tracking-widest text-yellow-800 flex items-center justify-center"><i class="ph-fill ph-caret-${collapsed ? 'right' : 'down'} mr-1.5" id="past-toggle-icon"></i><i class="ph-fill ph-star mr-1.5"></i> Today & Future <span class="ml-2 text-yellow-600 font-bold" id="past-toggle-label">(${pastItemCount} past item${pastItemCount !== 1 ? 's' : ''} ${collapsed ? 'hidden' : 'shown'})</span></span></td>`;
+                        toggleTr.innerHTML = `<td colspan="7" class="py-2.5 px-6 text-center shadow-sm"><span class="text-[11px] font-extrabold uppercase tracking-widest text-yellow-800 flex items-center justify-center"><i class="ph-fill ph-caret-${collapsed ? 'right' : 'down'} mr-1.5" id="past-toggle-icon"></i><i class="ph-fill ph-star mr-1.5"></i> Today & Future <span class="ml-2 text-yellow-600 font-bold" id="past-toggle-label">${pastCollapseLabel(collapsed, pastItemCount, pastClearedCount, pastUnclearedCount)}</span></span></td>`;
                         tbody.appendChild(toggleTr);
 
-                        // Apply collapsed state to past rows
-                        if (collapsed) pastRows.forEach(r => r.style.display = 'none');
+                        // Apply collapsed state — keep uncleared past rows visible
+                        if (collapsed) pastRows.forEach(r => { r.style.display = r.classList.contains('past-uncleared') ? '' : 'none'; });
                     }
                     dividerDrawn = true;
                 }
@@ -1148,7 +1160,7 @@
                         </div>
                     </td>
                 `;
-                if (!dividerDrawn) { tr.classList.add('past-ledger-row'); pastRows.push(tr); }
+                if (!dividerDrawn) { tr.classList.add('past-ledger-row'); if (!isCleared) tr.classList.add('past-uncleared'); pastRows.push(tr); }
                 tbody.appendChild(tr);
             });
 
@@ -1159,9 +1171,9 @@
                 toggleTr.id = 'today-divider';
                 toggleTr.className = 'bg-yellow-100/50 border-y-2 border-yellow-400 cursor-pointer select-none';
                 toggleTr.onclick = () => window.togglePastRows();
-                toggleTr.innerHTML = `<td colspan="7" class="py-2.5 px-6 text-center shadow-sm"><span class="text-[11px] font-extrabold uppercase tracking-widest text-yellow-800 flex items-center justify-center"><i class="ph-fill ph-caret-${collapsed ? 'right' : 'down'} mr-1.5" id="past-toggle-icon"></i><i class="ph-fill ph-star mr-1.5"></i> Past Items <span class="ml-2 text-yellow-600 font-bold" id="past-toggle-label">(${pastRows.length} item${pastRows.length !== 1 ? 's' : ''} ${collapsed ? 'hidden' : 'shown'})</span></span></td>`;
+                toggleTr.innerHTML = `<td colspan="7" class="py-2.5 px-6 text-center shadow-sm"><span class="text-[11px] font-extrabold uppercase tracking-widest text-yellow-800 flex items-center justify-center"><i class="ph-fill ph-caret-${collapsed ? 'right' : 'down'} mr-1.5" id="past-toggle-icon"></i><i class="ph-fill ph-star mr-1.5"></i> Past Items <span class="ml-2 text-yellow-600 font-bold" id="past-toggle-label">${pastCollapseLabel(collapsed, pastItemCount, pastClearedCount, pastUnclearedCount)}</span></span></td>`;
                 tbody.insertBefore(toggleTr, tbody.firstChild);
-                if (collapsed) pastRows.forEach(r => r.style.display = 'none');
+                if (collapsed) pastRows.forEach(r => { r.style.display = r.classList.contains('past-uncleared') ? '' : 'none'; });
             }
 
             // Update the 4 metric cards
