@@ -2299,7 +2299,7 @@ ${buildWashuContext()}`;
                 const fetchOpts = {
                     method: 'POST',
                     headers: req.headers,
-                    body: payloadJson,
+                    body: new Blob([payloadJson], { type: 'application/json' }),
                     signal: controller.signal
                 };
 
