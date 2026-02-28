@@ -967,6 +967,8 @@
         window.updateBankBalance = function(val) {
             const num = parseFloat(val) || 0;
             const key = getCurrentMonthKey();
+            const current = state.monthlyBalances[key];
+            if (current && current.amount === num && !current.autoCarry) return;
             state.monthlyBalances[key] = { amount: num, autoCarry: false };
             // Uncheck auto-carry since user manually typed a value
             const cb = document.getElementById('auto-carry-checkbox');
