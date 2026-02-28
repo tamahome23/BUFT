@@ -198,7 +198,7 @@
                     <div class="flex items-center bg-slate-50 px-4 py-2 rounded-full border border-slate-200 shadow-sm gap-2">
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden md:block">Bank:</span>
                         <span class="text-slate-400 font-bold">$</span>
-                        <input type="number" id="manual-bank-balance" class="font-extrabold text-slate-800 w-24 outline-none bg-transparent disabled:text-slate-400 disabled:cursor-not-allowed" onchange="updateBankBalance(this.value)">
+                        <input type="text" inputmode="decimal" autocomplete="one-time-code" data-lpignore="true" id="manual-bank-balance" class="font-extrabold text-slate-800 w-24 outline-none bg-transparent disabled:text-slate-400 disabled:cursor-not-allowed">
                         <label class="flex items-center gap-1 cursor-pointer ml-1 border-l border-slate-200 pl-2" title="Auto-carry: use previous month's end-of-month balance">
                             <input type="checkbox" id="auto-carry-checkbox" class="accent-brand-500 w-3.5 h-3.5 cursor-pointer" onchange="toggleAutoCarry(this.checked)">
                             <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider hidden md:block">Auto</span>
@@ -616,7 +616,7 @@
 
         let currentUser = null;
         let dataLoaded = { settings: false, txns: false, tpls: false };
-        let hasInitializedCore = false; 
+        let hasInitializedCore = false;
 
         const REAL_CURRENT_DATE = new Date(); 
         const WINDOW_START = new Date(2025, 0, 1);
@@ -965,16 +965,23 @@
         }
 
         window.updateBankBalance = function(val) {
-            const num = parseFloat(val) || 0;
+            const num = parseFloat(val);
+            if (isNaN(num)) return;
             const key = getCurrentMonthKey();
             const current = state.monthlyBalances[key];
-            if (current && current.amount === num && !current.autoCarry) return;
+            if (current && current.amount === num) return;
             state.monthlyBalances[key] = { amount: num, autoCarry: false };
-            // Uncheck auto-carry since user manually typed a value
             const cb = document.getElementById('auto-carry-checkbox');
             if (cb) cb.checked = false;
             setDoc(doc(db, 'users', currentUser.uid, 'settings', 'main'), { monthlyBalances: state.monthlyBalances }, { merge: true });
         }
+
+        // Explicit bank balance save — Enter key or blur (not onchange which Edge fires spuriously)
+        document.addEventListener('DOMContentLoaded', () => {
+            const bi = document.getElementById('manual-bank-balance');
+            bi.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.target.blur(); } });
+            bi.addEventListener('blur', () => { updateBankBalance(bi.value); });
+        });
 
         window.toggleAutoCarry = function(checked) {
             const key = getCurrentMonthKey();
